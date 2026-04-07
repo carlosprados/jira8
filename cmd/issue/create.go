@@ -1,0 +1,85 @@
+package issue
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
+
+	"github.com/amplia/jira-cli/cmd/app"
+	"github.com/amplia/jira-cli/internal/models"
+	"github.com/spf13/cobra"
+)
+
+var createCmd = &cobra.Command{
+	Use:   "create",
+	Short: "Create an issue",
+	RunE:  runCreate,
+}
+
+func init() {
+	createCmd.Flags().String("summary", "", "Issue summary (required)")
+	createCmd.Flags().String("type", "Task", "Issue type")
+	createCmd.Flags().String("project", "", "Project key (default from config)")
+	createCmd.Flags().String("description", "", "Issue description")
+	createCmd.Flags().String("assignee", "", "Assignee username (use 'me' for current user)")
+	createCmd.Flags().String("priority", "", "Issue priority")
+
+	_ = createCmd.MarkFlagRequired("summary")
+}
+
+func runCreate(cmd *cobra.Command, args []string) error {
+	a := app.Get()
+
+	summary, _ := cmd.Flags().GetString("summary")
+	issueType, _ := cmd.Flags().GetString("type")
+	project, _ := cmd.Flags().GetString("project")
+	if project == "" {
+		project = a.Config.Project
+	}
+	description, _ := cmd.Flags().GetString("description")
+	assignee, _ := cmd.Flags().GetString("assignee")
+	priority, _ := cmd.Flags().GetString("priority")
+
+	req := &models.CreateIssueRequest{
+		Fields: models.CreateIssueFields{
+			Project:     models.ProjectRef{Key: project},
+			Summary:     summary,
+			IssueType:   models.TypeRef{Name: issueType},
+			Description: description,
+		},
+	}
+
+	if assignee != "" {
+		username := assignee
+		if strings.EqualFold(assignee, "me") {
+			user, err := a.Client.GetMyself(context.Background())
+			if err != nil {
+				return fmt.Errorf("resolving current user: %w", err)
+			}
+			username = user.Name
+		}
+		req.Fields.Assignee = &models.UserRef{Name: username}
+	}
+
+	if priority != "" {
+		req.Fields.Priority = &models.PriorityRef{Name: priority}
+	}
+
+	resp, err := a.Client.CreateIssue(context.Background(), req)
+	if err != nil {
+		return err
+	}
+
+	if a.Output == "json" {
+		data, err := json.MarshalIndent(resp, "", "  ")
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(data))
+		return nil
+	}
+
+	fmt.Printf("Created %s\n", resp.Key)
+	return nil
+}
