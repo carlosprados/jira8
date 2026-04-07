@@ -2,10 +2,44 @@
 
 CLI tool for interacting with Jira Server 8 REST API v2, with MCP server support for AI agent integration.
 
-## Installation
+## Quick Setup
+
+Requires [Go](https://go.dev/) and [Task](https://taskfile.dev/).
+
+```bash
+task setup
+```
+
+This will:
+
+1. Build the binary
+2. Install it to `~/bin` (Windows) or `~/.local/bin` (Linux)
+3. Create `~/.jira.yaml` from the example template
+
+Then edit `~/.jira.yaml` with your credentials and verify:
+
+```bash
+task verify
+```
+
+### Available tasks
+
+| Task | Description |
+|------|-------------|
+| `task setup` | Full setup: build + install + create config |
+| `task build` | Build the binary |
+| `task install` | Build and copy to user PATH |
+| `task setup-config` | Copy config template to `~/.jira.yaml` |
+| `task verify` | Check binary and config are OK |
+| `task lint` | Run gofmt + go vet |
+| `task test` | Run all tests |
+| `task clean` | Remove built binary |
+
+### Manual installation
 
 ```bash
 go build -o jira8 .
+cp jira8 ~/bin/       # or ~/.local/bin/ on Linux
 ```
 
 ## Configuration

@@ -1,0 +1,16 @@
+# jira8 configuration file
+# Copy to ~/.jira.yaml and fill in your credentials
+#
+# Auth: Basic Auth (user + password) or Bearer token (token)
+
+url: https://jira.example.com/jira
+
+# Basic Auth (default for Jira Server without PAT)
+user: your.username
+password: your_password
+
+# Bearer token (uncomment if using Personal Access Token)
+# token: YOUR_PAT_HERE
+
+# Default project (optional — can also use --project flag)
+# project: YOUR_PROJECT_NAME
