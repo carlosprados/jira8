@@ -14,18 +14,18 @@ Create `~/.jira.yaml`:
 
 ```yaml
 # Basic Auth (user + password)
-url: https://jira.amplia.es/jira
+url: https://jira.example.com/jira
 user: your.username
 password: your.password
-project: ESA
+project: MYPROJ
 ```
 
 Or with a Personal Access Token (if enabled on your Jira instance):
 
 ```yaml
-url: https://jira.amplia.es/jira
+url: https://jira.example.com/jira
 token: <your-personal-access-token>
-project: ESA
+project: MYPROJ
 ```
 
 ### Configuration priority (highest to lowest)
@@ -47,9 +47,9 @@ project: ESA
 You can override the default project per-command or per-session:
 
 ```bash
-./jira8 issue list --project OGP                # per-command
-JIRA_PROJECT=OGP ./jira8 issue list             # per-command via env
-export JIRA_PROJECT=OGP && ./jira8 issue list   # per-session
+./jira8 issue list --project OTHER                # per-command
+JIRA_PROJECT=OTHER ./jira8 issue list             # per-command via env
+export JIRA_PROJECT=OTHER && ./jira8 issue list   # per-session
 ```
 
 ## Usage
@@ -60,15 +60,15 @@ export JIRA_PROJECT=OGP && ./jira8 issue list   # per-session
 jira8 issue list                              # all issues in default project
 jira8 issue list --status "In Progress"       # filter by status
 jira8 issue list --assignee me                # assigned to current user
-jira8 issue list --jql "project = ESA AND priority = High"
+jira8 issue list --jql "project = MYPROJ AND priority = High"
 jira8 issue list --max 100                    # up to 100 results
 ```
 
 ### View issue
 
 ```bash
-jira8 issue view ESA-123
-jira8 issue view ESA-123 -o json
+jira8 issue view MYPROJ-123
+jira8 issue view MYPROJ-123 -o json
 ```
 
 ### Create issue
@@ -81,16 +81,16 @@ jira8 issue create --summary "New feature" --type Story --description "Details..
 ### Edit issue
 
 ```bash
-jira8 issue edit ESA-123 --summary "Updated title"
-jira8 issue edit ESA-123 --assignee john.doe --priority Medium
-jira8 issue edit ESA-123 --assignee ""        # unassign
+jira8 issue edit MYPROJ-123 --summary "Updated title"
+jira8 issue edit MYPROJ-123 --assignee john.doe --priority Medium
+jira8 issue edit MYPROJ-123 --assignee ""        # unassign
 ```
 
 ### Transitions
 
 ```bash
-jira8 issue transitions ESA-123               # list available transitions
-jira8 issue transition ESA-123 --to "Done"    # perform transition
+jira8 issue transitions MYPROJ-123               # list available transitions
+jira8 issue transition MYPROJ-123 --to "Done"    # perform transition
 ```
 
 ### Project metadata
@@ -101,7 +101,7 @@ Query valid values for issue types, statuses, and priorities:
 jira8 project types                       # issue types available for creation
 jira8 project statuses                    # statuses grouped by issue type
 jira8 project priorities                  # global priority levels
-jira8 project types --project OGP         # for a different project
+jira8 project types --project OTHER         # for a different project
 ```
 
 ### Output format
