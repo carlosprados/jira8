@@ -1,1 +1,3 @@
-jira-cli
+jira8
+.jira.yaml
+.env

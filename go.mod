@@ -1,4 +1,4 @@
-module github.com/amplia/jira-cli
+module github.com/amplia/jira8
 
 go 1.25.6
 

@@ -5,15 +5,16 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/amplia/jira-cli/cmd/app"
-	"github.com/amplia/jira-cli/internal/models"
+	"github.com/amplia/jira8/cmd/app"
+	"github.com/amplia/jira8/internal/models"
 	"github.com/spf13/cobra"
 )
 
 var editCmd = &cobra.Command{
-	Use:   "edit ISSUE-KEY",
-	Short: "Edit an issue",
-	Args:  cobra.ExactArgs(1),
+	Use:     "edit ISSUE-KEY",
+	Short:   "Edit an issue",
+	Example: "  jira8 issue edit ESA-123 --summary \"New title\" --assignee me",
+	Args:    cobra.ExactArgs(1),
 	RunE:  runEdit,
 }
 

@@ -1,8 +1,8 @@
 package app
 
 import (
-	"github.com/amplia/jira-cli/internal/client"
-	"github.com/amplia/jira-cli/internal/config"
+	"github.com/amplia/jira8/internal/client"
+	"github.com/amplia/jira8/internal/config"
 )
 
 // State holds shared state accessible by all subcommands.

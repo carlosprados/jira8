@@ -4,18 +4,25 @@ import (
 	"fmt"
 
 	"github.com/spf13/viper"
+	"github.com/subosito/gotenv"
 )
 
 // Config holds the Jira CLI configuration.
 type Config struct {
-	URL     string `mapstructure:"url"`
-	Email   string `mapstructure:"email"`
-	Token   string `mapstructure:"token"`
-	Project string `mapstructure:"project"`
+	URL      string `mapstructure:"url"`
+	Email    string `mapstructure:"email"`
+	Token    string `mapstructure:"token"`
+	User     string `mapstructure:"user"`
+	Password string `mapstructure:"password"`
+	Project  string `mapstructure:"project"`
 }
 
 // Load reads configuration from file, environment variables, and defaults.
+// It also loads .env from the current directory if present.
 func Load(configFile string) (*Config, error) {
+	// Load .env file (silently ignore if not found)
+	_ = gotenv.Load()
+
 	if configFile != "" {
 		viper.SetConfigFile(configFile)
 	} else {
@@ -30,6 +37,9 @@ func Load(configFile string) (*Config, error) {
 	_ = viper.BindEnv("url", "JIRA_URL")
 	_ = viper.BindEnv("email", "JIRA_EMAIL")
 	_ = viper.BindEnv("token", "JIRA_TOKEN")
+	_ = viper.BindEnv("user", "JIRA_USER")
+	_ = viper.BindEnv("password", "JIRA_PASSWORD")
+	_ = viper.BindEnv("project", "JIRA_PROJECT")
 
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
@@ -45,8 +55,10 @@ func Load(configFile string) (*Config, error) {
 		return nil, fmt.Errorf("parsing config: %w", err)
 	}
 
-	if cfg.Token == "" {
-		return nil, fmt.Errorf("token is required: set JIRA_TOKEN, add 'token' to ~/.jira.yaml, or use --token flag")
+	hasToken := cfg.Token != ""
+	hasBasic := cfg.User != "" && cfg.Password != ""
+	if !hasToken && !hasBasic {
+		return nil, fmt.Errorf("auth required: set 'token' (Bearer) or 'user'+'password' (Basic) in ~/.jira.yaml, env vars, or flags")
 	}
 
 	return &cfg, nil

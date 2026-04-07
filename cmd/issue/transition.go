@@ -6,22 +6,24 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/amplia/jira-cli/cmd/app"
-	"github.com/amplia/jira-cli/internal/models"
+	"github.com/amplia/jira8/cmd/app"
+	"github.com/amplia/jira8/internal/models"
 	"github.com/spf13/cobra"
 )
 
 var transitionCmd = &cobra.Command{
-	Use:   "transition ISSUE-KEY",
-	Short: "Transition an issue to a new status",
-	Args:  cobra.ExactArgs(1),
+	Use:     "transition ISSUE-KEY",
+	Short:   "Transition an issue to a new status",
+	Example: "  jira8 issue transition ESA-123 --to \"Done\"",
+	Args:    cobra.ExactArgs(1),
 	RunE:  runTransition,
 }
 
 var transitionsCmd = &cobra.Command{
-	Use:   "transitions ISSUE-KEY",
-	Short: "List available transitions for an issue",
-	Args:  cobra.ExactArgs(1),
+	Use:     "transitions ISSUE-KEY",
+	Short:   "List available transitions for an issue",
+	Example: "  jira8 issue transitions ESA-123",
+	Args:    cobra.ExactArgs(1),
 	RunE:  runTransitions,
 }
 

@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/amplia/jira-cli/cmd"
+	"github.com/amplia/jira8/cmd"
 )
 
 func main() {

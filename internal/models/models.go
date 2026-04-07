@@ -154,6 +154,26 @@ type CreateIssueResponse struct {
 	Self string `json:"self"`
 }
 
+// ProjectStatuses represents the response from GET /rest/api/2/project/{key}/statuses.
+// Returns issue types with their available statuses.
+type IssueTypeWithStatuses struct {
+	Name     string   `json:"name"`
+	ID       string   `json:"id"`
+	Statuses []Status `json:"statuses"`
+}
+
+// CreateMeta represents the response from GET /rest/api/2/issue/createmeta.
+type CreateMeta struct {
+	Projects []CreateMetaProject `json:"projects"`
+}
+
+// CreateMetaProject contains issue types available for creation in a project.
+type CreateMetaProject struct {
+	Key        string      `json:"key"`
+	Name       string      `json:"name"`
+	IssueTypes []IssueType `json:"issuetypes"`
+}
+
 // JiraError represents a Jira API error response.
 type JiraError struct {
 	ErrorMessages []string          `json:"errorMessages"`

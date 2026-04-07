@@ -3,6 +3,7 @@ package client
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/amplia/jira-cli/internal/config"
-	"github.com/amplia/jira-cli/internal/models"
+	"github.com/amplia/jira8/internal/config"
+	"github.com/amplia/jira8/internal/models"
 )
 
 const (
@@ -46,15 +47,20 @@ func (e *APIError) Error() string {
 // Client is the Jira REST API client.
 type Client struct {
 	baseURL    string
-	token      string
+	authHeader string
 	httpClient *http.Client
 }
 
 // New creates a new Jira API client from config.
+// Supports Bearer token auth and Basic auth (user:password).
 func New(cfg *config.Config) *Client {
+	auth := "Bearer " + cfg.Token
+	if cfg.Token == "" && cfg.User != "" {
+		auth = "Basic " + base64.StdEncoding.EncodeToString([]byte(cfg.User+":"+cfg.Password))
+	}
 	return &Client{
-		baseURL: strings.TrimRight(cfg.URL, "/"),
-		token:   cfg.Token,
+		baseURL:    strings.TrimRight(cfg.URL, "/"),
+		authHeader: auth,
 		httpClient: &http.Client{
 			Timeout: 15 * time.Second,
 		},
@@ -79,7 +85,7 @@ func (c *Client) do(ctx context.Context, method, path string, body any) ([]byte,
 		if err != nil {
 			return nil, fmt.Errorf("creating request: %w", err)
 		}
-		req.Header.Set("Authorization", "Bearer "+c.token)
+		req.Header.Set("Authorization", c.authHeader)
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Accept", "application/json")
 
@@ -240,6 +246,52 @@ func (c *Client) GetMyself(ctx context.Context) (*models.User, error) {
 		return nil, fmt.Errorf("parsing user: %w", err)
 	}
 	return &user, nil
+}
+
+// GetProjectStatuses returns issue types and their statuses for a project.
+func (c *Client) GetProjectStatuses(ctx context.Context, projectKey string) ([]models.IssueTypeWithStatuses, error) {
+	data, err := c.do(ctx, http.MethodGet, "/project/"+url.PathEscape(projectKey)+"/statuses", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var result []models.IssueTypeWithStatuses
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, fmt.Errorf("parsing project statuses: %w", err)
+	}
+	return result, nil
+}
+
+// GetCreateMeta returns issue types available for creation in a project.
+func (c *Client) GetCreateMeta(ctx context.Context, projectKey string) (*models.CreateMetaProject, error) {
+	path := "/issue/createmeta?projectKeys=" + url.QueryEscape(projectKey)
+	data, err := c.do(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var meta models.CreateMeta
+	if err := json.Unmarshal(data, &meta); err != nil {
+		return nil, fmt.Errorf("parsing create meta: %w", err)
+	}
+	if len(meta.Projects) == 0 {
+		return nil, fmt.Errorf("project %s not found or no issue types available", projectKey)
+	}
+	return &meta.Projects[0], nil
+}
+
+// GetPriorities returns all available priorities.
+func (c *Client) GetPriorities(ctx context.Context) ([]models.Priority, error) {
+	data, err := c.do(ctx, http.MethodGet, "/priority", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var result []models.Priority
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, fmt.Errorf("parsing priorities: %w", err)
+	}
+	return result, nil
 }
 
 // BuildJQL constructs a JQL query from individual filter parameters.

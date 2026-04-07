@@ -5,14 +5,15 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/amplia/jira-cli/cmd/app"
+	"github.com/amplia/jira8/cmd/app"
 	"github.com/spf13/cobra"
 )
 
 var viewCmd = &cobra.Command{
-	Use:   "view ISSUE-KEY",
-	Short: "View issue details",
-	Args:  cobra.ExactArgs(1),
+	Use:     "view ISSUE-KEY",
+	Short:   "View issue details",
+	Example: "  jira8 issue view ESA-123",
+	Args:    cobra.ExactArgs(1),
 	RunE:  runView,
 }
 

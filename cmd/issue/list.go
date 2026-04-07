@@ -5,14 +5,15 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/amplia/jira-cli/cmd/app"
-	"github.com/amplia/jira-cli/internal/client"
+	"github.com/amplia/jira8/cmd/app"
+	"github.com/amplia/jira8/internal/client"
 	"github.com/spf13/cobra"
 )
 
 var listCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List issues",
+	Use:     "list",
+	Short:   "List issues",
+	Example: "  jira8 issue list --status \"In Progress\" --assignee me",
 	RunE:  runList,
 }
 

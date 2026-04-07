@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build and Run
 
 ```bash
-go build -o jira-cli .        # build binary
+go build -o jira8 .        # build binary
 go vet ./...                   # lint
 go test ./...                  # run all tests
 go test ./internal/client/...  # run tests for a single package
@@ -31,6 +31,6 @@ This is a Go CLI tool targeting **Jira Server 8.7.1 REST API v2** (`https://jira
 
 - User references use `{"name": "username"}`, **not** `accountId` (that's Jira Cloud).
 - Description is plain text / wiki markup, **not** ADF.
-- Auth is `Authorization: Bearer <PAT>`, **not** Basic auth.
+- Auth supports both **Bearer token** (`token` field) and **Basic Auth** (`user` + `password` fields). Basic Auth is the default for Jira Server without PAT enabled.
 - Transitions require two calls: GET transitions to resolve name→ID, then POST.
 - `--assignee me` in list uses JQL `currentUser()` (no extra API call); in create/edit it calls `/rest/api/2/myself` to resolve the username.

@@ -3,10 +3,11 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/amplia/jira-cli/cmd/app"
-	"github.com/amplia/jira-cli/cmd/issue"
-	"github.com/amplia/jira-cli/internal/client"
-	"github.com/amplia/jira-cli/internal/config"
+	"github.com/amplia/jira8/cmd/app"
+	"github.com/amplia/jira8/cmd/issue"
+	"github.com/amplia/jira8/cmd/project"
+	"github.com/amplia/jira8/internal/client"
+	"github.com/amplia/jira8/internal/config"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -14,8 +15,8 @@ import (
 var configFile string
 
 var rootCmd = &cobra.Command{
-	Use:   "jira",
-	Short: "CLI for Jira Server",
+	Use:   "jira8",
+	Short: "CLI for Jira Server 8",
 	Long:  "A command-line interface for interacting with Jira Server 8 REST API.",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		if cmd.Name() == "help" || cmd.Name() == "completion" {
@@ -34,7 +35,8 @@ var rootCmd = &cobra.Command{
 		})
 		return nil
 	},
-	SilenceUsage: true,
+	SilenceUsage:  false,
+	SilenceErrors: true,
 }
 
 func init() {
@@ -50,10 +52,15 @@ func init() {
 	_ = viper.BindPFlag("output", rootCmd.PersistentFlags().Lookup("output"))
 
 	rootCmd.AddCommand(issue.IssueCmd)
+	rootCmd.AddCommand(project.ProjectCmd)
 	rootCmd.AddCommand(mcpCmd)
 }
 
 // Execute runs the root command.
 func Execute() error {
-	return rootCmd.Execute()
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Fprintf(rootCmd.ErrOrStderr(), "Error: %s\n", err)
+		return err
+	}
+	return nil
 }

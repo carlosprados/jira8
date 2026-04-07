@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/amplia/jira-cli/cmd/app"
-	"github.com/amplia/jira-cli/internal/client"
-	"github.com/amplia/jira-cli/internal/models"
+	"github.com/amplia/jira8/cmd/app"
+	"github.com/amplia/jira8/internal/client"
+	"github.com/amplia/jira8/internal/models"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/spf13/cobra"

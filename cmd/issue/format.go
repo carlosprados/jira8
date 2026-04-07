@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/amplia/jira-cli/internal/models"
+	"github.com/amplia/jira8/internal/models"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -30,10 +30,23 @@ func colorStatus(status string) string {
 }
 
 func truncate(s string, max int) string {
-	if len(s) <= max {
+	runes := []rune(s)
+	if len(runes) <= max {
 		return s
 	}
-	return s[:max-1] + "…"
+	return string(runes[:max-1]) + "…"
+}
+
+// pad truncates or pads s to exactly width runes.
+func pad(s string, width int) string {
+	runes := []rune(s)
+	if len(runes) > width {
+		return string(runes[:width-1]) + "…"
+	}
+	if len(runes) < width {
+		return s + strings.Repeat(" ", width-len(runes))
+	}
+	return s
 }
 
 func userName(u *models.User) string {
@@ -73,25 +86,36 @@ func printIssueTable(issues []models.Issue) {
 		return
 	}
 
+	// Column widths
+	const (
+		wKey      = 12
+		wType     = 10
+		wStatus   = 15
+		wPriority = 10
+		wAssignee = 20
+		wSummary  = 55
+		sep       = "  "
+	)
+
 	// Header
-	fmt.Printf("%s  %-10s  %-15s  %-10s  %-15s  %s\n",
-		headerStyle.Render(fmt.Sprintf("%-12s", "KEY")),
-		headerStyle.Render("TYPE"),
-		headerStyle.Render("STATUS"),
-		headerStyle.Render("PRIORITY"),
-		headerStyle.Render("ASSIGNEE"),
-		headerStyle.Render("SUMMARY"),
+	fmt.Println(
+		headerStyle.Render(pad("KEY", wKey)) + sep +
+			headerStyle.Render(pad("TYPE", wType)) + sep +
+			headerStyle.Render(pad("STATUS", wStatus)) + sep +
+			headerStyle.Render(pad("PRIORITY", wPriority)) + sep +
+			headerStyle.Render(pad("ASSIGNEE", wAssignee)) + sep +
+			headerStyle.Render("SUMMARY"),
 	)
 
 	for _, issue := range issues {
 		status := statusName(issue.Fields.Status)
-		fmt.Printf("%s  %-10s  %-15s  %-10s  %-15s  %s\n",
-			keyStyle.Render(fmt.Sprintf("%-12s", issue.Key)),
-			truncate(typeName(issue.Fields.IssueType), 10),
-			colorStatus(truncate(status, 15)),
-			truncate(priorityName(issue.Fields.Priority), 10),
-			truncate(userName(issue.Fields.Assignee), 15),
-			truncate(issue.Fields.Summary, 60),
+		fmt.Println(
+			keyStyle.Render(pad(issue.Key, wKey)) + sep +
+				pad(typeName(issue.Fields.IssueType), wType) + sep +
+				colorStatus(pad(status, wStatus)) + sep +
+				pad(priorityName(issue.Fields.Priority), wPriority) + sep +
+				pad(userName(issue.Fields.Assignee), wAssignee) + sep +
+				truncate(issue.Fields.Summary, wSummary),
 		)
 	}
 
