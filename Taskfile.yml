@@ -1,0 +1,75 @@
+version: "3"
+
+vars:
+  BINARY: jira8{{if eq OS "windows"}}.exe{{end}}
+  INSTALL_DIR: '{{if eq OS "windows"}}{{.HOME}}/bin{{else}}{{.HOME}}/.local/bin{{end}}'
+
+tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+
+  build:
+    desc: Build the jira8 binary
+    cmds:
+      - go build -o {{.BINARY}} .
+    sources:
+      - "**/*.go"
+      - go.mod
+      - go.sum
+    generates:
+      - "{{.BINARY}}"
+
+  lint:
+    desc: Run linters
+    cmds:
+      - gofmt -s -w .
+      - go vet ./...
+
+  test:
+    desc: Run all tests
+    cmds:
+      - go test ./...
+
+  install:
+    desc: Build and install jira8 to user PATH
+    deps: [build]
+    cmds:
+      - mkdir -p {{.INSTALL_DIR}}
+      - cp {{.BINARY}} {{.INSTALL_DIR}}/{{.BINARY}}
+      - echo "Installed {{.BINARY}} to {{.INSTALL_DIR}}/{{.BINARY}}"
+    status:
+      - test -f {{.INSTALL_DIR}}/{{.BINARY}}
+      - test {{.INSTALL_DIR}}/{{.BINARY}} -nt {{.BINARY}}
+
+  setup-config:
+    desc: Copy example config to ~/.jira.yaml (will NOT overwrite existing)
+    cmds:
+      - cp -n .jira.yaml.example {{.HOME}}/.jira.yaml
+      - echo "Config created at ~/.jira.yaml — edit it with your credentials"
+    preconditions:
+      - sh: "! test -f {{.HOME}}/.jira.yaml"
+        msg: "~/.jira.yaml already exists. Edit it manually or remove it first."
+
+  setup:
+    desc: Full setup — build, install, and create config
+    cmds:
+      - task: install
+      - task: setup-config
+      - echo ""
+      - echo "Setup complete. Next steps:"
+      - echo "  1. Edit ~/.jira.yaml with your Jira credentials"
+      - echo "  2. Verify PATH includes {{.INSTALL_DIR}}"
+      - 'echo "  3. Test with: jira8 issue list --project YOUR_PROJECT"'
+
+  verify:
+    desc: Verify installation works (requires configured ~/.jira.yaml)
+    cmds:
+      - '{{.BINARY}} --help > /dev/null 2>&1 && echo "Binary OK" || echo "Binary not found in PATH"'
+      - 'test -f {{.HOME}}/.jira.yaml && echo "Config OK" || echo "Config missing: run task setup-config"'
+
+  clean:
+    desc: Remove built binary
+    cmds:
+      - rm -f {{.BINARY}}
