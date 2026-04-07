@@ -1,3 +1,5 @@
 jira8
+*.exe
 .jira.yaml
 .env
+.claude/
