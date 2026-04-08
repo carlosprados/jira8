@@ -135,6 +135,14 @@ func printIssueDetail(issue *models.Issue) {
 	printField("Assignee", userName(f.Assignee))
 	printField("Reporter", userName(f.Reporter))
 
+	if f.Parent != nil {
+		parentStr := f.Parent.Key
+		if f.Parent.Fields != nil && f.Parent.Fields.Summary != "" {
+			parentStr += " — " + f.Parent.Fields.Summary
+		}
+		printField("Parent", parentStr)
+	}
+
 	if f.Project != nil {
 		printField("Project", fmt.Sprintf("%s (%s)", f.Project.Name, f.Project.Key))
 	}
