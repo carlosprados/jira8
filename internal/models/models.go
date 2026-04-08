@@ -174,6 +174,35 @@ type CreateMetaProject struct {
 	IssueTypes []IssueType `json:"issuetypes"`
 }
 
+// AddWorklogRequest is the POST body for /rest/api/2/issue/{key}/worklog.
+type AddWorklogRequest struct {
+	TimeSpent string `json:"timeSpent"`
+	Started   string `json:"started,omitempty"`
+	Comment   string `json:"comment,omitempty"`
+}
+
+// Worklog represents a single worklog entry.
+type Worklog struct {
+	ID             string `json:"id"`
+	Self           string `json:"self"`
+	Author         *User  `json:"author,omitempty"`
+	UpdateAuthor   *User  `json:"updateAuthor,omitempty"`
+	Created        string `json:"created"`
+	Updated        string `json:"updated"`
+	Started        string `json:"started"`
+	TimeSpent      string `json:"timeSpent"`
+	TimeSpentSecs  int    `json:"timeSpentSeconds"`
+	Comment        string `json:"comment,omitempty"`
+}
+
+// WorklogsResponse is the response from GET /rest/api/2/issue/{key}/worklog.
+type WorklogsResponse struct {
+	StartAt    int       `json:"startAt"`
+	MaxResults int       `json:"maxResults"`
+	Total      int       `json:"total"`
+	Worklogs   []Worklog `json:"worklogs"`
+}
+
 // JiraError represents a Jira API error response.
 type JiraError struct {
 	ErrorMessages []string          `json:"errorMessages"`

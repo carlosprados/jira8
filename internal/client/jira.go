@@ -234,6 +234,34 @@ func (c *Client) DoTransition(ctx context.Context, key string, req *models.Trans
 	return err
 }
 
+// AddWorklog adds a worklog entry to an issue.
+func (c *Client) AddWorklog(ctx context.Context, key string, req *models.AddWorklogRequest) (*models.Worklog, error) {
+	data, err := c.do(ctx, http.MethodPost, "/issue/"+url.PathEscape(key)+"/worklog", req)
+	if err != nil {
+		return nil, err
+	}
+
+	var wl models.Worklog
+	if err := json.Unmarshal(data, &wl); err != nil {
+		return nil, fmt.Errorf("parsing worklog response: %w", err)
+	}
+	return &wl, nil
+}
+
+// GetWorklogs returns all worklog entries for an issue.
+func (c *Client) GetWorklogs(ctx context.Context, key string) ([]models.Worklog, error) {
+	data, err := c.do(ctx, http.MethodGet, "/issue/"+url.PathEscape(key)+"/worklog", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp models.WorklogsResponse
+	if err := json.Unmarshal(data, &resp); err != nil {
+		return nil, fmt.Errorf("parsing worklogs: %w", err)
+	}
+	return resp.Worklogs, nil
+}
+
 // GetMyself returns the currently authenticated user.
 func (c *Client) GetMyself(ctx context.Context) (*models.User, error) {
 	data, err := c.do(ctx, http.MethodGet, "/myself", nil)
