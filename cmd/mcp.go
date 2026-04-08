@@ -69,6 +69,7 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 			mcp.WithString("description", mcp.Description("Issue description")),
 			mcp.WithString("assignee", mcp.Description("Assignee username")),
 			mcp.WithString("priority", mcp.Description("Priority name")),
+			mcp.WithString("parent", mcp.Description("Parent issue key for Sub-task creation (e.g. ESA-65)")),
 		),
 		createIssueHandler(jc),
 	)
@@ -206,6 +207,10 @@ func createIssueHandler(jc *client.Client) server.ToolHandlerFunc {
 
 		if priority := req.GetString("priority", ""); priority != "" {
 			createReq.Fields.Priority = &models.PriorityRef{Name: priority}
+		}
+
+		if parent := req.GetString("parent", ""); parent != "" {
+			createReq.Fields.Parent = &models.IssueKeyRef{Key: parent}
 		}
 
 		resp, err := jc.CreateIssue(ctx, createReq)
