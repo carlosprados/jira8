@@ -26,11 +26,25 @@ type IssueFields struct {
 	Assignee    *User       `json:"assignee,omitempty"`
 	Reporter    *User       `json:"reporter,omitempty"`
 	Project     *Project    `json:"project,omitempty"`
+	Parent      *ParentIssue `json:"parent,omitempty"`
 	Created     string      `json:"created,omitempty"`
 	Updated     string      `json:"updated,omitempty"`
 	Labels      []string    `json:"labels,omitempty"`
 	Components  []Component `json:"components,omitempty"`
 	Comment     *Comments   `json:"comment,omitempty"`
+}
+
+// ParentIssue represents the parent of a Sub-task issue.
+type ParentIssue struct {
+	ID     string       `json:"id"`
+	Key    string       `json:"key"`
+	Self   string       `json:"self,omitempty"`
+	Fields *ParentFields `json:"fields,omitempty"`
+}
+
+// ParentFields contains the summary of a parent issue (returned by Jira inside parent.fields).
+type ParentFields struct {
+	Summary string `json:"summary"`
 }
 
 // Status represents a Jira issue status.
