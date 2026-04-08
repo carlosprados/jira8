@@ -25,6 +25,7 @@ func init() {
 	createCmd.Flags().String("description", "", "Issue description")
 	createCmd.Flags().String("assignee", "", "Assignee username (use 'me' for current user)")
 	createCmd.Flags().String("priority", "", "Issue priority")
+	createCmd.Flags().String("parent", "", "Parent issue key for Sub-task creation (e.g. ESA-65)")
 
 	_ = createCmd.MarkFlagRequired("summary")
 }
@@ -41,6 +42,7 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	description, _ := cmd.Flags().GetString("description")
 	assignee, _ := cmd.Flags().GetString("assignee")
 	priority, _ := cmd.Flags().GetString("priority")
+	parent, _ := cmd.Flags().GetString("parent")
 
 	req := &models.CreateIssueRequest{
 		Fields: models.CreateIssueFields{
@@ -65,6 +67,10 @@ func runCreate(cmd *cobra.Command, args []string) error {
 
 	if priority != "" {
 		req.Fields.Priority = &models.PriorityRef{Name: priority}
+	}
+
+	if parent != "" {
+		req.Fields.Parent = &models.IssueKeyRef{Key: parent}
 	}
 
 	resp, err := a.Client.CreateIssue(context.Background(), req)

@@ -123,6 +123,12 @@ type CreateIssueFields struct {
 	Description string       `json:"description,omitempty"`
 	Assignee    *UserRef     `json:"assignee,omitempty"`
 	Priority    *PriorityRef `json:"priority,omitempty"`
+	Parent      *IssueKeyRef `json:"parent,omitempty"`
+}
+
+// IssueKeyRef references an issue by key (used for parent in sub-task creation).
+type IssueKeyRef struct {
+	Key string `json:"key"`
 }
 
 // ProjectRef references a project by key.
