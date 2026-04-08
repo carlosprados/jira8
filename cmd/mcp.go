@@ -102,6 +102,25 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 		listTransitionsHandler(jc),
 	)
 
+	s.AddTool(
+		mcp.NewTool("jira_add_worklog",
+			mcp.WithDescription("Add a worklog entry to a Jira issue"),
+			mcp.WithString("key", mcp.Required(), mcp.Description("Issue key (e.g. ESA-123)")),
+			mcp.WithString("time_spent", mcp.Required(), mcp.Description("Time spent (e.g., 2h, 30m, 1d)")),
+			mcp.WithString("started", mcp.Description("Start date/time in ISO 8601 (optional, defaults to now)")),
+			mcp.WithString("comment", mcp.Description("Worklog comment")),
+		),
+		addWorklogHandler(jc),
+	)
+
+	s.AddTool(
+		mcp.NewTool("jira_list_worklogs",
+			mcp.WithDescription("List worklog entries for a Jira issue"),
+			mcp.WithString("key", mcp.Required(), mcp.Description("Issue key (e.g. ESA-123)")),
+		),
+		listWorklogsHandler(jc),
+	)
+
 	return server.ServeStdio(s)
 }
 
@@ -292,6 +311,48 @@ func transitionIssueHandler(jc *client.Client) server.ToolHandlerFunc {
 			target = match.To.Name
 		}
 		return mcp.NewToolResultText(fmt.Sprintf(`{"transitioned": "%s", "to": "%s"}`, key, target)), nil
+	}
+}
+
+func addWorklogHandler(jc *client.Client) server.ToolHandlerFunc {
+	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		key, err := req.RequireString("key")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		timeSpent, err := req.RequireString("time_spent")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		wlReq := &models.AddWorklogRequest{
+			TimeSpent: timeSpent,
+			Started:   req.GetString("started", ""),
+			Comment:   req.GetString("comment", ""),
+		}
+
+		wl, err := jc.AddWorklog(ctx, key, wlReq)
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		return mcp.NewToolResultText(toJSON(wl)), nil
+	}
+}
+
+func listWorklogsHandler(jc *client.Client) server.ToolHandlerFunc {
+	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		key, err := req.RequireString("key")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		worklogs, err := jc.GetWorklogs(ctx, key)
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		return mcp.NewToolResultText(toJSON(worklogs)), nil
 	}
 }
 
