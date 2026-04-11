@@ -34,3 +34,7 @@ This is a Go CLI tool targeting **Jira Server 8.7.1 REST API v2** (`https://jira
 - Auth supports both **Bearer token** (`token` field) and **Basic Auth** (`user` + `password` fields). Basic Auth is the default for Jira Server without PAT enabled.
 - Transitions require two calls: GET transitions to resolve name→ID, then POST.
 - `--assignee me` in list uses JQL `currentUser()` (no extra API call); in create/edit it calls `/rest/api/2/myself` to resolve the username.
+
+## Git conventions
+
+- **No `Co-Authored-By: Claude` trailers** in commit messages.

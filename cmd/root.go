@@ -12,7 +12,14 @@ import (
 	"github.com/spf13/viper"
 )
 
-var configFile string
+var (
+	configFile string
+
+	// Set by GoReleaser via ldflags.
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
 
 var rootCmd = &cobra.Command{
 	Use:   "jira8",
@@ -50,6 +57,9 @@ func init() {
 	_ = viper.BindPFlag("token", rootCmd.PersistentFlags().Lookup("token"))
 	_ = viper.BindPFlag("project", rootCmd.PersistentFlags().Lookup("project"))
 	_ = viper.BindPFlag("output", rootCmd.PersistentFlags().Lookup("output"))
+
+	rootCmd.Version = version
+	rootCmd.SetVersionTemplate(fmt.Sprintf("jira8 %s (commit: %s, built: %s)\n", version, commit, date))
 
 	rootCmd.AddCommand(issue.IssueCmd)
 	rootCmd.AddCommand(project.ProjectCmd)
