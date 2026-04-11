@@ -98,6 +98,19 @@ type Comment struct {
 	Created string `json:"created"`
 }
 
+// AddCommentRequest is the POST body for /rest/api/2/issue/{key}/comment.
+type AddCommentRequest struct {
+	Body string `json:"body"`
+}
+
+// CommentsResponse is the response from GET /rest/api/2/issue/{key}/comment.
+type CommentsResponse struct {
+	StartAt    int       `json:"startAt"`
+	MaxResults int       `json:"maxResults"`
+	Total      int       `json:"total"`
+	Comments   []Comment `json:"comments"`
+}
+
 // TransitionsResponse represents the response from GET /rest/api/2/issue/{key}/transitions.
 type TransitionsResponse struct {
 	Transitions []Transition `json:"transitions"`

@@ -262,6 +262,34 @@ func (c *Client) GetWorklogs(ctx context.Context, key string) ([]models.Worklog,
 	return resp.Worklogs, nil
 }
 
+// AddComment adds a comment to an issue.
+func (c *Client) AddComment(ctx context.Context, key string, req *models.AddCommentRequest) (*models.Comment, error) {
+	data, err := c.do(ctx, http.MethodPost, "/issue/"+url.PathEscape(key)+"/comment", req)
+	if err != nil {
+		return nil, err
+	}
+
+	var comment models.Comment
+	if err := json.Unmarshal(data, &comment); err != nil {
+		return nil, fmt.Errorf("parsing comment response: %w", err)
+	}
+	return &comment, nil
+}
+
+// GetComments returns all comments for an issue.
+func (c *Client) GetComments(ctx context.Context, key string) ([]models.Comment, error) {
+	data, err := c.do(ctx, http.MethodGet, "/issue/"+url.PathEscape(key)+"/comment", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp models.CommentsResponse
+	if err := json.Unmarshal(data, &resp); err != nil {
+		return nil, fmt.Errorf("parsing comments: %w", err)
+	}
+	return resp.Comments, nil
+}
+
 // GetMyself returns the currently authenticated user.
 func (c *Client) GetMyself(ctx context.Context) (*models.User, error) {
 	data, err := c.do(ctx, http.MethodGet, "/myself", nil)

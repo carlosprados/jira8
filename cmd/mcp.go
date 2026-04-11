@@ -122,6 +122,46 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 		listWorklogsHandler(jc),
 	)
 
+	s.AddTool(
+		mcp.NewTool("jira_add_comment",
+			mcp.WithDescription("Add a comment to a Jira issue"),
+			mcp.WithString("key", mcp.Required(), mcp.Description("Issue key (e.g. ESA-123)")),
+			mcp.WithString("body", mcp.Required(), mcp.Description("Comment body text")),
+		),
+		addCommentHandler(jc),
+	)
+
+	s.AddTool(
+		mcp.NewTool("jira_list_comments",
+			mcp.WithDescription("List comments on a Jira issue"),
+			mcp.WithString("key", mcp.Required(), mcp.Description("Issue key (e.g. ESA-123)")),
+		),
+		listCommentsHandler(jc),
+	)
+
+	s.AddTool(
+		mcp.NewTool("jira_list_issue_types",
+			mcp.WithDescription("List issue types available for creation in a project (e.g. Bug, Task, Story, Sub-task)"),
+			mcp.WithString("project", mcp.Required(), mcp.Description("Project key (e.g. ESA)")),
+		),
+		listIssueTypesHandler(jc),
+	)
+
+	s.AddTool(
+		mcp.NewTool("jira_list_statuses",
+			mcp.WithDescription("List all statuses grouped by issue type for a project"),
+			mcp.WithString("project", mcp.Required(), mcp.Description("Project key (e.g. ESA)")),
+		),
+		listStatusesHandler(jc),
+	)
+
+	s.AddTool(
+		mcp.NewTool("jira_list_priorities",
+			mcp.WithDescription("List all available issue priorities"),
+		),
+		listPrioritiesHandler(jc),
+	)
+
 	return server.ServeStdio(s)
 }
 
@@ -358,6 +398,85 @@ func listWorklogsHandler(jc *client.Client) server.ToolHandlerFunc {
 		}
 
 		return mcp.NewToolResultText(toJSON(worklogs)), nil
+	}
+}
+
+func addCommentHandler(jc *client.Client) server.ToolHandlerFunc {
+	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		key, err := req.RequireString("key")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		body, err := req.RequireString("body")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		comment, err := jc.AddComment(ctx, key, &models.AddCommentRequest{Body: body})
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		return mcp.NewToolResultText(toJSON(comment)), nil
+	}
+}
+
+func listCommentsHandler(jc *client.Client) server.ToolHandlerFunc {
+	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		key, err := req.RequireString("key")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		comments, err := jc.GetComments(ctx, key)
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		return mcp.NewToolResultText(toJSON(comments)), nil
+	}
+}
+
+func listIssueTypesHandler(jc *client.Client) server.ToolHandlerFunc {
+	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		project, err := req.RequireString("project")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		meta, err := jc.GetCreateMeta(ctx, project)
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		return mcp.NewToolResultText(toJSON(meta.IssueTypes)), nil
+	}
+}
+
+func listStatusesHandler(jc *client.Client) server.ToolHandlerFunc {
+	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		project, err := req.RequireString("project")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		statuses, err := jc.GetProjectStatuses(ctx, project)
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		return mcp.NewToolResultText(toJSON(statuses)), nil
+	}
+}
+
+func listPrioritiesHandler(jc *client.Client) server.ToolHandlerFunc {
+	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		priorities, err := jc.GetPriorities(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		return mcp.NewToolResultText(toJSON(priorities)), nil
 	}
 }
 
