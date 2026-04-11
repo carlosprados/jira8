@@ -150,6 +150,15 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 	)
 
 	s.AddTool(
+		mcp.NewTool("jira_delete_comment",
+			mcp.WithDescription("Delete a comment from a Jira issue"),
+			mcp.WithString("key", mcp.Required(), mcp.Description("Issue key (e.g. ESA-123)")),
+			mcp.WithString("comment_id", mcp.Required(), mcp.Description("Comment ID")),
+		),
+		deleteCommentHandler(jc),
+	)
+
+	s.AddTool(
 		mcp.NewTool("jira_list_issue_types",
 			mcp.WithDescription("List issue types available for creation in a project (e.g. Bug, Task, Story, Sub-task)"),
 			mcp.WithString("project", mcp.Required(), mcp.Description("Project key (e.g. ESA)")),
@@ -468,6 +477,25 @@ func editCommentHandler(jc *client.Client) server.ToolHandlerFunc {
 		}
 
 		return mcp.NewToolResultText(toJSON(comment)), nil
+	}
+}
+
+func deleteCommentHandler(jc *client.Client) server.ToolHandlerFunc {
+	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		key, err := req.RequireString("key")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		commentID, err := req.RequireString("comment_id")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		if err := jc.DeleteComment(ctx, key, commentID); err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		return mcp.NewToolResultText(fmt.Sprintf(`{"deleted": "%s", "issue": "%s"}`, commentID, key)), nil
 	}
 }
 

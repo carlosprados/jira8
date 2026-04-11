@@ -291,6 +291,13 @@ func (c *Client) EditComment(ctx context.Context, key, commentID, body string) (
 	return &comment, nil
 }
 
+// DeleteComment removes a comment from an issue.
+func (c *Client) DeleteComment(ctx context.Context, key, commentID string) error {
+	path := "/issue/" + url.PathEscape(key) + "/comment/" + url.PathEscape(commentID)
+	_, err := c.do(ctx, http.MethodDelete, path, nil)
+	return err
+}
+
 // GetComments returns all comments for an issue.
 func (c *Client) GetComments(ctx context.Context, key string) ([]models.Comment, error) {
 	data, err := c.do(ctx, http.MethodGet, "/issue/"+url.PathEscape(key)+"/comment", nil)

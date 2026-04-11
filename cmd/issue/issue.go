@@ -21,4 +21,5 @@ func init() {
 	IssueCmd.AddCommand(commentAddCmd)
 	IssueCmd.AddCommand(commentListCmd)
 	IssueCmd.AddCommand(commentEditCmd)
+	IssueCmd.AddCommand(commentDeleteCmd)
 }
