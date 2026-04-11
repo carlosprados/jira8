@@ -140,6 +140,16 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 	)
 
 	s.AddTool(
+		mcp.NewTool("jira_edit_comment",
+			mcp.WithDescription("Edit an existing comment on a Jira issue"),
+			mcp.WithString("key", mcp.Required(), mcp.Description("Issue key (e.g. ESA-123)")),
+			mcp.WithString("comment_id", mcp.Required(), mcp.Description("Comment ID")),
+			mcp.WithString("body", mcp.Required(), mcp.Description("Updated comment body (wiki markup)")),
+		),
+		editCommentHandler(jc),
+	)
+
+	s.AddTool(
 		mcp.NewTool("jira_list_issue_types",
 			mcp.WithDescription("List issue types available for creation in a project (e.g. Bug, Task, Story, Sub-task)"),
 			mcp.WithString("project", mcp.Required(), mcp.Description("Project key (e.g. ESA)")),
@@ -434,6 +444,30 @@ func listCommentsHandler(jc *client.Client) server.ToolHandlerFunc {
 		}
 
 		return mcp.NewToolResultText(toJSON(comments)), nil
+	}
+}
+
+func editCommentHandler(jc *client.Client) server.ToolHandlerFunc {
+	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		key, err := req.RequireString("key")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		commentID, err := req.RequireString("comment_id")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		body, err := req.RequireString("body")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		comment, err := jc.EditComment(ctx, key, commentID, body)
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		return mcp.NewToolResultText(toJSON(comment)), nil
 	}
 }
 

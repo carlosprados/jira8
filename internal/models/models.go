@@ -18,27 +18,27 @@ type Issue struct {
 
 // IssueFields contains the fields of a Jira issue.
 type IssueFields struct {
-	Summary     string      `json:"summary"`
-	Description string      `json:"description,omitempty"`
-	Status      *Status     `json:"status,omitempty"`
-	IssueType   *IssueType  `json:"issuetype,omitempty"`
-	Priority    *Priority   `json:"priority,omitempty"`
-	Assignee    *User       `json:"assignee,omitempty"`
-	Reporter    *User       `json:"reporter,omitempty"`
-	Project     *Project    `json:"project,omitempty"`
+	Summary     string       `json:"summary"`
+	Description string       `json:"description,omitempty"`
+	Status      *Status      `json:"status,omitempty"`
+	IssueType   *IssueType   `json:"issuetype,omitempty"`
+	Priority    *Priority    `json:"priority,omitempty"`
+	Assignee    *User        `json:"assignee,omitempty"`
+	Reporter    *User        `json:"reporter,omitempty"`
+	Project     *Project     `json:"project,omitempty"`
 	Parent      *ParentIssue `json:"parent,omitempty"`
-	Created     string      `json:"created,omitempty"`
-	Updated     string      `json:"updated,omitempty"`
-	Labels      []string    `json:"labels,omitempty"`
-	Components  []Component `json:"components,omitempty"`
-	Comment     *Comments   `json:"comment,omitempty"`
+	Created     string       `json:"created,omitempty"`
+	Updated     string       `json:"updated,omitempty"`
+	Labels      []string     `json:"labels,omitempty"`
+	Components  []Component  `json:"components,omitempty"`
+	Comment     *Comments    `json:"comment,omitempty"`
 }
 
 // ParentIssue represents the parent of a Sub-task issue.
 type ParentIssue struct {
-	ID     string       `json:"id"`
-	Key    string       `json:"key"`
-	Self   string       `json:"self,omitempty"`
+	ID     string        `json:"id"`
+	Key    string        `json:"key"`
+	Self   string        `json:"self,omitempty"`
 	Fields *ParentFields `json:"fields,omitempty"`
 }
 
@@ -93,9 +93,11 @@ type Comments struct {
 
 // Comment represents a single comment.
 type Comment struct {
+	ID      string `json:"id"`
 	Author  *User  `json:"author"`
 	Body    string `json:"body"`
 	Created string `json:"created"`
+	Updated string `json:"updated,omitempty"`
 }
 
 // AddCommentRequest is the POST body for /rest/api/2/issue/{key}/comment.
@@ -216,16 +218,16 @@ type AddWorklogRequest struct {
 
 // Worklog represents a single worklog entry.
 type Worklog struct {
-	ID             string `json:"id"`
-	Self           string `json:"self"`
-	Author         *User  `json:"author,omitempty"`
-	UpdateAuthor   *User  `json:"updateAuthor,omitempty"`
-	Created        string `json:"created"`
-	Updated        string `json:"updated"`
-	Started        string `json:"started"`
-	TimeSpent      string `json:"timeSpent"`
-	TimeSpentSecs  int    `json:"timeSpentSeconds"`
-	Comment        string `json:"comment,omitempty"`
+	ID            string `json:"id"`
+	Self          string `json:"self"`
+	Author        *User  `json:"author,omitempty"`
+	UpdateAuthor  *User  `json:"updateAuthor,omitempty"`
+	Created       string `json:"created"`
+	Updated       string `json:"updated"`
+	Started       string `json:"started"`
+	TimeSpent     string `json:"timeSpent"`
+	TimeSpentSecs int    `json:"timeSpentSeconds"`
+	Comment       string `json:"comment,omitempty"`
 }
 
 // WorklogsResponse is the response from GET /rest/api/2/issue/{key}/worklog.
