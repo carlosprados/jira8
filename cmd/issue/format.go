@@ -122,7 +122,10 @@ func printIssueTable(issues []models.Issue) {
 	fmt.Printf("\n%d issue(s)\n", len(issues))
 }
 
-func printIssueDetail(issue *models.Issue) {
+// printIssueDetailWithEpic renders the issue, additionally showing Epic Name and
+// Epic Link columns when the corresponding custom field IDs have been resolved.
+// Pass empty strings to skip the Epic rendering.
+func printIssueDetailWithEpic(issue *models.Issue, epicNameID, epicLinkID string) {
 	f := issue.Fields
 
 	fmt.Println()
@@ -134,6 +137,17 @@ func printIssueDetail(issue *models.Issue) {
 	printField("Priority", priorityName(f.Priority))
 	printField("Assignee", userName(f.Assignee))
 	printField("Reporter", userName(f.Reporter))
+
+	if epicNameID != "" {
+		if name := f.CustomString(epicNameID); name != "" {
+			printField("Epic Name", name)
+		}
+	}
+	if epicLinkID != "" {
+		if link := f.CustomString(epicLinkID); link != "" {
+			printField("Epic", link)
+		}
+	}
 
 	if f.Parent != nil {
 		parentStr := f.Parent.Key

@@ -14,13 +14,15 @@ var listCmd = &cobra.Command{
 	Use:     "list",
 	Short:   "List issues",
 	Example: "  jira8 issue list --status \"In Progress\" --assignee me",
-	RunE:  runList,
+	RunE:    runList,
 }
 
 func init() {
 	listCmd.Flags().String("project", "", "Project key (default from config)")
 	listCmd.Flags().String("status", "", "Filter by status")
 	listCmd.Flags().String("assignee", "", "Filter by assignee (use 'me' for current user)")
+	listCmd.Flags().String("type", "", "Filter by issue type (e.g. Epic, Story, Bug)")
+	listCmd.Flags().String("epic", "", "Filter by parent Epic key (issues linked to this Epic)")
 	listCmd.Flags().String("jql", "", "Raw JQL query (overrides other filters)")
 	listCmd.Flags().Int("max", 50, "Maximum number of results")
 }
@@ -34,7 +36,15 @@ func runList(cmd *cobra.Command, args []string) error {
 		}
 		status, _ := cmd.Flags().GetString("status")
 		assignee, _ := cmd.Flags().GetString("assignee")
-		jql = client.BuildJQL(project, status, assignee)
+		issueType, _ := cmd.Flags().GetString("type")
+		epic, _ := cmd.Flags().GetString("epic")
+		jql = client.BuildJQLWith(client.JQLFilters{
+			Project:  project,
+			Status:   status,
+			Assignee: assignee,
+			Type:     issueType,
+			Epic:     epic,
+		})
 	}
 
 	max, _ := cmd.Flags().GetInt("max")

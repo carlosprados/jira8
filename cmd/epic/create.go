@@ -1,4 +1,4 @@
-package issue
+package epic
 
 import (
 	"context"
@@ -13,30 +13,28 @@ import (
 
 var createCmd = &cobra.Command{
 	Use:     "create",
-	Short:   "Create an issue",
-	Example: "  jira8 issue create --summary \"Fix login\" --type Bug --priority High",
+	Short:   "Create an Epic",
+	Example: "  jira8 epic create --name \"Q2 Refactor\" --summary \"Refactor billing pipeline\"",
 	RunE:    runCreate,
 }
 
 func init() {
-	createCmd.Flags().String("summary", "", "Issue summary (required)")
-	createCmd.Flags().String("type", "Task", "Issue type")
+	createCmd.Flags().String("name", "", "Epic Name (required, shown on the Agile board)")
+	createCmd.Flags().String("summary", "", "Epic summary (required)")
 	createCmd.Flags().String("project", "", "Project key (default from config)")
-	createCmd.Flags().String("description", "", "Issue description")
+	createCmd.Flags().String("description", "", "Epic description")
 	createCmd.Flags().String("assignee", "", "Assignee username (use 'me' for current user)")
-	createCmd.Flags().String("priority", "", "Issue priority")
-	createCmd.Flags().String("parent", "", "Parent issue key for Sub-task creation (e.g. ESA-65)")
-	createCmd.Flags().String("epic-name", "", "Epic Name (required when --type Epic)")
-	createCmd.Flags().String("epic-link", "", "Epic key to associate this issue with (e.g. ESA-42)")
+	createCmd.Flags().String("priority", "", "Priority name")
 
+	_ = createCmd.MarkFlagRequired("name")
 	_ = createCmd.MarkFlagRequired("summary")
 }
 
 func runCreate(cmd *cobra.Command, args []string) error {
 	a := app.Get()
 
+	name, _ := cmd.Flags().GetString("name")
 	summary, _ := cmd.Flags().GetString("summary")
-	issueType, _ := cmd.Flags().GetString("type")
 	project, _ := cmd.Flags().GetString("project")
 	if project == "" {
 		project = a.Config.Project
@@ -44,24 +42,19 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	description, _ := cmd.Flags().GetString("description")
 	assignee, _ := cmd.Flags().GetString("assignee")
 	priority, _ := cmd.Flags().GetString("priority")
-	parent, _ := cmd.Flags().GetString("parent")
-	epicName, _ := cmd.Flags().GetString("epic-name")
-	epicLink, _ := cmd.Flags().GetString("epic-link")
 
-	isEpic := strings.EqualFold(issueType, "Epic")
-	if isEpic && epicName == "" {
-		return fmt.Errorf("--epic-name is required when --type Epic")
-	}
-	if epicName != "" && !isEpic {
-		return fmt.Errorf("--epic-name only applies when --type Epic")
+	epicNameID, _, err := a.EpicFieldIDs(context.Background())
+	if err != nil {
+		return err
 	}
 
 	req := &models.CreateIssueRequest{
 		Fields: models.CreateIssueFields{
 			Project:     models.ProjectRef{Key: project},
 			Summary:     summary,
-			IssueType:   models.TypeRef{Name: issueType},
+			IssueType:   models.TypeRef{Name: "Epic"},
 			Description: description,
+			Extra:       map[string]any{epicNameID: name},
 		},
 	}
 
@@ -81,24 +74,6 @@ func runCreate(cmd *cobra.Command, args []string) error {
 		req.Fields.Priority = &models.PriorityRef{Name: priority}
 	}
 
-	if parent != "" {
-		req.Fields.Parent = &models.IssueKeyRef{Key: parent}
-	}
-
-	if epicName != "" || epicLink != "" {
-		epicNameID, epicLinkID, err := a.EpicFieldIDs(context.Background())
-		if err != nil {
-			return err
-		}
-		req.Fields.Extra = map[string]any{}
-		if epicName != "" {
-			req.Fields.Extra[epicNameID] = epicName
-		}
-		if epicLink != "" {
-			req.Fields.Extra[epicLinkID] = epicLink
-		}
-	}
-
 	resp, err := a.Client.CreateIssue(context.Background(), req)
 	if err != nil {
 		return err
@@ -113,6 +88,6 @@ func runCreate(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	fmt.Printf("Created %s\n", resp.Key)
+	fmt.Printf("Created Epic %s\n", resp.Key)
 	return nil
 }

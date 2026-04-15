@@ -46,6 +46,8 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 			mcp.WithString("project", mcp.Description("Project key (e.g. ESA)")),
 			mcp.WithString("status", mcp.Description("Filter by status name")),
 			mcp.WithString("assignee", mcp.Description("Filter by assignee username, use 'me' for current user")),
+			mcp.WithString("issue_type", mcp.Description("Filter by issue type (e.g. Epic, Story, Bug)")),
+			mcp.WithString("epic", mcp.Description("Filter issues linked to this Epic key (e.g. ESA-42)")),
 			mcp.WithString("jql", mcp.Description("Raw JQL query (overrides other filters)")),
 			mcp.WithNumber("max_results", mcp.Description("Maximum number of results (default 50)")),
 		),
@@ -65,11 +67,13 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 			mcp.WithDescription("Create a new Jira issue"),
 			mcp.WithString("project", mcp.Required(), mcp.Description("Project key")),
 			mcp.WithString("summary", mcp.Required(), mcp.Description("Issue summary")),
-			mcp.WithString("issue_type", mcp.Required(), mcp.Description("Issue type (e.g. Bug, Task, Story)")),
+			mcp.WithString("issue_type", mcp.Required(), mcp.Description("Issue type (e.g. Bug, Task, Story, Epic)")),
 			mcp.WithString("description", mcp.Description("Issue description")),
 			mcp.WithString("assignee", mcp.Description("Assignee username")),
 			mcp.WithString("priority", mcp.Description("Priority name")),
 			mcp.WithString("parent", mcp.Description("Parent issue key for Sub-task creation (e.g. ESA-65)")),
+			mcp.WithString("epic_name", mcp.Description("Epic Name (required when issue_type is Epic)")),
+			mcp.WithString("epic_link", mcp.Description("Epic key to associate this issue with (e.g. ESA-42)")),
 		),
 		createIssueHandler(jc),
 	)
@@ -82,6 +86,8 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 			mcp.WithString("description", mcp.Description("New description")),
 			mcp.WithString("assignee", mcp.Description("New assignee username (empty to unassign)")),
 			mcp.WithString("priority", mcp.Description("New priority name")),
+			mcp.WithString("epic_name", mcp.Description("New Epic Name (only for Epics)")),
+			mcp.WithString("epic_link", mcp.Description("New Epic key to link to (empty string to detach)")),
 		),
 		editIssueHandler(jc),
 	)
@@ -162,6 +168,61 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 		listPrioritiesHandler(jc),
 	)
 
+	s.AddTool(
+		mcp.NewTool("jira_list_epics",
+			mcp.WithDescription("List Epics in a project (shortcut for jira_list_issues with issuetype=Epic)"),
+			mcp.WithString("project", mcp.Description("Project key (e.g. ESA)")),
+			mcp.WithString("status", mcp.Description("Filter by status name")),
+			mcp.WithNumber("max_results", mcp.Description("Maximum number of results (default 50)")),
+		),
+		listEpicsHandler(jc, a.Config.Project),
+	)
+
+	s.AddTool(
+		mcp.NewTool("jira_list_epic_children",
+			mcp.WithDescription("List issues linked to an Epic (Epic Link = KEY)"),
+			mcp.WithString("epic_key", mcp.Required(), mcp.Description("Epic issue key (e.g. ESA-42)")),
+			mcp.WithNumber("max_results", mcp.Description("Maximum number of results (default 100)")),
+		),
+		listEpicChildrenHandler(jc),
+	)
+
+	s.AddTool(
+		mcp.NewTool("jira_create_epic",
+			mcp.WithDescription("Create an Epic (ergonomic shortcut over jira_create_issue with issue_type=Epic)"),
+			mcp.WithString("project", mcp.Required(), mcp.Description("Project key")),
+			mcp.WithString("name", mcp.Required(), mcp.Description("Epic Name (shown on the Agile board)")),
+			mcp.WithString("summary", mcp.Required(), mcp.Description("Epic summary")),
+			mcp.WithString("description", mcp.Description("Epic description")),
+			mcp.WithString("assignee", mcp.Description("Assignee username (use 'me' for current user)")),
+			mcp.WithString("priority", mcp.Description("Priority name")),
+		),
+		createEpicHandler(jc),
+	)
+
+	s.AddTool(
+		mcp.NewTool("jira_edit_epic",
+			mcp.WithDescription("Edit an Epic (ergonomic shortcut over jira_edit_issue exposing 'name' for Epic Name)"),
+			mcp.WithString("key", mcp.Required(), mcp.Description("Epic issue key (e.g. ESA-42)")),
+			mcp.WithString("name", mcp.Description("New Epic Name")),
+			mcp.WithString("summary", mcp.Description("New summary")),
+			mcp.WithString("description", mcp.Description("New description")),
+			mcp.WithString("assignee", mcp.Description("New assignee username (empty to unassign)")),
+			mcp.WithString("priority", mcp.Description("New priority name")),
+		),
+		editEpicHandler(jc),
+	)
+
+	s.AddTool(
+		mcp.NewTool("jira_view_epic",
+			mcp.WithDescription("Get an Epic and (optionally) its linked children in a single call"),
+			mcp.WithString("key", mcp.Required(), mcp.Description("Epic issue key (e.g. ESA-42)")),
+			mcp.WithBoolean("include_children", mcp.Description("Include linked children in the response (default true)")),
+			mcp.WithNumber("max_children", mcp.Description("Maximum children to return (default 100)")),
+		),
+		viewEpicHandler(jc),
+	)
+
 	return server.ServeStdio(s)
 }
 
@@ -177,10 +238,13 @@ func listIssuesHandler(jc *client.Client, defaultProject string) server.ToolHand
 	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		jql := req.GetString("jql", "")
 		if jql == "" {
-			project := req.GetString("project", defaultProject)
-			status := req.GetString("status", "")
-			assignee := req.GetString("assignee", "")
-			jql = client.BuildJQL(project, status, assignee)
+			jql = client.BuildJQLWith(client.JQLFilters{
+				Project:  req.GetString("project", defaultProject),
+				Status:   req.GetString("status", ""),
+				Assignee: req.GetString("assignee", ""),
+				Type:     req.GetString("issue_type", ""),
+				Epic:     req.GetString("epic", ""),
+			})
 		}
 
 		max := req.GetInt("max_results", 50)
@@ -224,6 +288,16 @@ func createIssueHandler(jc *client.Client) server.ToolHandlerFunc {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
+		epicName := req.GetString("epic_name", "")
+		epicLink := req.GetString("epic_link", "")
+		isEpic := strings.EqualFold(issueType, "Epic")
+		if isEpic && epicName == "" {
+			return mcp.NewToolResultError("epic_name is required when issue_type is Epic"), nil
+		}
+		if epicName != "" && !isEpic {
+			return mcp.NewToolResultError("epic_name only applies when issue_type is Epic"), nil
+		}
+
 		createReq := &models.CreateIssueRequest{
 			Fields: models.CreateIssueFields{
 				Project:     models.ProjectRef{Key: project},
@@ -251,6 +325,20 @@ func createIssueHandler(jc *client.Client) server.ToolHandlerFunc {
 
 		if parent := req.GetString("parent", ""); parent != "" {
 			createReq.Fields.Parent = &models.IssueKeyRef{Key: parent}
+		}
+
+		if epicName != "" || epicLink != "" {
+			epicNameID, epicLinkID, err := app.Get().EpicFieldIDs(ctx)
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			createReq.Fields.Extra = map[string]any{}
+			if epicName != "" {
+				createReq.Fields.Extra[epicNameID] = epicName
+			}
+			if epicLink != "" {
+				createReq.Fields.Extra[epicLinkID] = epicLink
+			}
 		}
 
 		resp, err := jc.CreateIssue(ctx, createReq)
@@ -299,6 +387,27 @@ func editIssueHandler(jc *client.Client) server.ToolHandlerFunc {
 			fields["priority"] = models.PriorityRef{Name: priority}
 		}
 
+		_, hasEpicName := args["epic_name"]
+		_, hasEpicLink := args["epic_link"]
+		if hasEpicName || hasEpicLink {
+			epicNameID, epicLinkID, err := app.Get().EpicFieldIDs(ctx)
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if v, ok := args["epic_name"]; ok {
+				s, _ := v.(string)
+				fields[epicNameID] = s
+			}
+			if v, ok := args["epic_link"]; ok {
+				s, _ := v.(string)
+				if s == "" {
+					fields[epicLinkID] = nil
+				} else {
+					fields[epicLinkID] = s
+				}
+			}
+		}
+
 		if len(fields) == 0 {
 			return mcp.NewToolResultError("no fields to update"), nil
 		}
@@ -309,6 +418,50 @@ func editIssueHandler(jc *client.Client) server.ToolHandlerFunc {
 		}
 
 		return mcp.NewToolResultText(fmt.Sprintf(`{"updated": "%s"}`, key)), nil
+	}
+}
+
+// listEpicsHandler lists Epics in a project — ergonomic shortcut over the generic
+// list tool with issuetype=Epic preset.
+func listEpicsHandler(jc *client.Client, defaultProject string) server.ToolHandlerFunc {
+	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		jql := client.BuildJQLWith(client.JQLFilters{
+			Project: req.GetString("project", defaultProject),
+			Status:  req.GetString("status", ""),
+			Type:    "Epic",
+		})
+
+		// Include Epic Name in the response so AI agents can display it without
+		// an extra round-trip. A failure to resolve is non-fatal.
+		var extra []string
+		if epicNameID, _, err := app.Get().EpicFieldIDs(ctx); err == nil && epicNameID != "" {
+			extra = append(extra, epicNameID)
+		}
+
+		max := req.GetInt("max_results", 50)
+		issues, err := jc.SearchAllIssues(ctx, jql, max, extra...)
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		return mcp.NewToolResultText(toJSON(issues)), nil
+	}
+}
+
+// listEpicChildrenHandler lists issues linked to an Epic via the Epic Link field.
+func listEpicChildrenHandler(jc *client.Client) server.ToolHandlerFunc {
+	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		key, err := req.RequireString("epic_key")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		jql := client.BuildJQLWith(client.JQLFilters{Epic: key})
+		max := req.GetInt("max_results", 100)
+		issues, err := jc.SearchAllIssues(ctx, jql, max)
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		return mcp.NewToolResultText(toJSON(issues)), nil
 	}
 }
 
@@ -493,5 +646,150 @@ func listTransitionsHandler(jc *client.Client) server.ToolHandlerFunc {
 		}
 
 		return mcp.NewToolResultText(toJSON(transitions)), nil
+	}
+}
+
+// createEpicHandler creates an Epic with the required Epic Name custom field
+// resolved dynamically. Mirrors `jira8 epic create`.
+func createEpicHandler(jc *client.Client) server.ToolHandlerFunc {
+	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		project, err := req.RequireString("project")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		name, err := req.RequireString("name")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		summary, err := req.RequireString("summary")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		epicNameID, _, err := app.Get().EpicFieldIDs(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		createReq := &models.CreateIssueRequest{
+			Fields: models.CreateIssueFields{
+				Project:     models.ProjectRef{Key: project},
+				Summary:     summary,
+				IssueType:   models.TypeRef{Name: "Epic"},
+				Description: req.GetString("description", ""),
+				Extra:       map[string]any{epicNameID: name},
+			},
+		}
+
+		if assignee := req.GetString("assignee", ""); assignee != "" {
+			username := assignee
+			if strings.EqualFold(assignee, "me") {
+				user, err := jc.GetMyself(ctx)
+				if err != nil {
+					return mcp.NewToolResultError(fmt.Sprintf("resolving current user: %s", err)), nil
+				}
+				username = user.Name
+			}
+			createReq.Fields.Assignee = &models.UserRef{Name: username}
+		}
+		if priority := req.GetString("priority", ""); priority != "" {
+			createReq.Fields.Priority = &models.PriorityRef{Name: priority}
+		}
+
+		resp, err := jc.CreateIssue(ctx, createReq)
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		return mcp.NewToolResultText(toJSON(resp)), nil
+	}
+}
+
+// editEpicHandler edits an Epic, exposing 'name' as a friendly alias for the
+// Epic Name custom field. Mirrors `jira8 epic edit`.
+func editEpicHandler(jc *client.Client) server.ToolHandlerFunc {
+	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		key, err := req.RequireString("key")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		args := req.GetArguments()
+		fields := make(map[string]any)
+
+		if v, ok := args["name"]; ok {
+			epicNameID, _, err := app.Get().EpicFieldIDs(ctx)
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			s, _ := v.(string)
+			fields[epicNameID] = s
+		}
+		if v, ok := args["summary"]; ok {
+			fields["summary"] = v
+		}
+		if v, ok := args["description"]; ok {
+			fields["description"] = v
+		}
+		if v, ok := args["assignee"]; ok {
+			assignee, _ := v.(string)
+			if assignee == "" {
+				fields["assignee"] = nil
+			} else {
+				username := assignee
+				if strings.EqualFold(assignee, "me") {
+					user, err := jc.GetMyself(ctx)
+					if err != nil {
+						return mcp.NewToolResultError(fmt.Sprintf("resolving current user: %s", err)), nil
+					}
+					username = user.Name
+				}
+				fields["assignee"] = models.UserRef{Name: username}
+			}
+		}
+		if v, ok := args["priority"]; ok {
+			priority, _ := v.(string)
+			fields["priority"] = models.PriorityRef{Name: priority}
+		}
+
+		if len(fields) == 0 {
+			return mcp.NewToolResultError("no fields to update"), nil
+		}
+		if err := jc.EditIssue(ctx, key, &models.EditIssueRequest{Fields: fields}); err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		return mcp.NewToolResultText(fmt.Sprintf(`{"updated": "%s"}`, key)), nil
+	}
+}
+
+// viewEpicHandler returns an Epic together with its linked children in a single
+// call. Mirrors `jira8 epic view` (which fetches both eagerly).
+func viewEpicHandler(jc *client.Client) server.ToolHandlerFunc {
+	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		key, err := req.RequireString("key")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		issue, err := jc.GetIssue(ctx, key)
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		includeChildren := req.GetBool("include_children", true)
+		var children []models.Issue
+		if includeChildren {
+			max := req.GetInt("max_children", 100)
+			jql := client.BuildJQLWith(client.JQLFilters{Epic: key})
+			children, err = jc.SearchAllIssues(ctx, jql, max)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("fetching children: %s", err)), nil
+			}
+		}
+
+		out := struct {
+			Epic     *models.Issue  `json:"epic"`
+			Children []models.Issue `json:"children,omitempty"`
+		}{Epic: issue, Children: children}
+		return mcp.NewToolResultText(toJSON(out)), nil
 	}
 }

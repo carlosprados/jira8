@@ -94,6 +94,8 @@ export JIRA_PROJECT=OTHER && ./jira8 issue list   # per-session
 jira8 issue list                              # all issues in default project
 jira8 issue list --status "In Progress"       # filter by status
 jira8 issue list --assignee me                # assigned to current user
+jira8 issue list --type Story                 # filter by issue type
+jira8 issue list --epic MYPROJ-42             # issues linked to this Epic
 jira8 issue list --jql "project = MYPROJ AND priority = High"
 jira8 issue list --max 100                    # up to 100 results
 ```
@@ -110,6 +112,8 @@ jira8 issue view MYPROJ-123 -o json
 ```bash
 jira8 issue create --summary "Fix login bug" --type Bug
 jira8 issue create --summary "New feature" --type Story --description "Details..." --assignee me --priority High
+jira8 issue create --summary "Ingest worker" --type Story --epic-link MYPROJ-42   # link to Epic
+jira8 issue create --summary "Q2 Refactor" --type Epic --epic-name "Q2 Refactor"  # Epic
 ```
 
 ### Edit issue
@@ -117,7 +121,30 @@ jira8 issue create --summary "New feature" --type Story --description "Details..
 ```bash
 jira8 issue edit MYPROJ-123 --summary "Updated title"
 jira8 issue edit MYPROJ-123 --assignee john.doe --priority Medium
-jira8 issue edit MYPROJ-123 --assignee ""        # unassign
+jira8 issue edit MYPROJ-123 --assignee ""              # unassign
+jira8 issue edit MYPROJ-123 --epic-link MYPROJ-42      # link to Epic
+jira8 issue edit MYPROJ-123 --epic-link ""             # detach from Epic
+```
+
+### Epics
+
+Dedicated ergonomic subcommand for Epic CRUD and child listing. Custom field IDs
+(`Epic Name`, `Epic Link`) are resolved dynamically from the Jira instance on
+first use — no hardcoded `customfield_XXXXX` required.
+
+```bash
+jira8 epic list                                   # Epics in default project
+jira8 epic list --status "In Progress"
+
+jira8 epic view MYPROJ-42                         # Epic + its children
+jira8 epic view MYPROJ-42 --no-children           # Epic only
+jira8 epic children MYPROJ-42                     # just the children table
+
+jira8 epic create --name "Q2 Refactor" --summary "Refactor billing pipeline"
+jira8 epic create --name "Q2 Refactor" --summary "..." --description "..." --priority High
+
+jira8 epic edit MYPROJ-42 --name "Q2 Refactor (rev 2)"
+jira8 epic edit MYPROJ-42 --summary "New summary" --assignee me
 ```
 
 ### Transitions
@@ -125,6 +152,21 @@ jira8 issue edit MYPROJ-123 --assignee ""        # unassign
 ```bash
 jira8 issue transitions MYPROJ-123               # list available transitions
 jira8 issue transition MYPROJ-123 --to "Done"    # perform transition
+```
+
+### Comments
+
+```bash
+jira8 issue comment-list MYPROJ-123                          # list comments
+jira8 issue comment-add MYPROJ-123 --body "Looks good"       # add a comment
+```
+
+### Worklogs
+
+```bash
+jira8 issue worklog-list MYPROJ-123                                  # list worklogs
+jira8 issue worklog-add MYPROJ-123 --time 2h --comment "Investig."   # add a worklog
+jira8 issue worklog-add MYPROJ-123 --time 30m --date 2026-04-15T09:00:00.000+0200
 ```
 
 ### Project metadata
@@ -154,12 +196,24 @@ jira8 mcp serve
 
 | Tool | Description |
 |------|-------------|
-| `jira_list_issues` | List issues with filters or JQL |
+| `jira_list_issues` | List issues (supports `issue_type`, `epic`, JQL, etc.) |
 | `jira_get_issue` | Get issue details |
-| `jira_create_issue` | Create a new issue |
-| `jira_edit_issue` | Edit an existing issue |
+| `jira_create_issue` | Create a new issue (supports `epic_name`, `epic_link`) |
+| `jira_edit_issue` | Edit an existing issue (supports `epic_name`, `epic_link`) |
 | `jira_transition_issue` | Transition an issue |
 | `jira_list_transitions` | List available transitions |
+| `jira_add_comment` | Add a comment |
+| `jira_list_comments` | List comments |
+| `jira_add_worklog` | Add a worklog entry |
+| `jira_list_worklogs` | List worklog entries |
+| `jira_list_issue_types` | List issue types for a project |
+| `jira_list_statuses` | List statuses grouped by issue type |
+| `jira_list_priorities` | List available priorities |
+| `jira_list_epics` | List Epics in a project |
+| `jira_list_epic_children` | List issues linked to an Epic |
+| `jira_create_epic` | Create an Epic (shortcut for `jira_create_issue` with `issue_type=Epic`) |
+| `jira_edit_epic` | Edit an Epic (exposes friendly `name` for Epic Name) |
+| `jira_view_epic` | Get an Epic and (optionally) its linked children in one call |
 
 ### Claude Code integration
 

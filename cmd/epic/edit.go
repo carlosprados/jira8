@@ -1,4 +1,4 @@
-package issue
+package epic
 
 import (
 	"context"
@@ -11,20 +11,19 @@ import (
 )
 
 var editCmd = &cobra.Command{
-	Use:     "edit ISSUE-KEY",
-	Short:   "Edit an issue",
-	Example: "  jira8 issue edit ESA-123 --summary \"New title\" --assignee me",
+	Use:     "edit EPIC-KEY",
+	Short:   "Edit an Epic",
+	Example: "  jira8 epic edit ESA-42 --name \"Renamed epic\" --summary \"New summary\"",
 	Args:    cobra.ExactArgs(1),
 	RunE:    runEdit,
 }
 
 func init() {
+	editCmd.Flags().String("name", "", "New Epic Name")
 	editCmd.Flags().String("summary", "", "New summary")
 	editCmd.Flags().String("description", "", "New description")
 	editCmd.Flags().String("assignee", "", "New assignee (use 'me' for current user, empty to unassign)")
 	editCmd.Flags().String("priority", "", "New priority")
-	editCmd.Flags().String("epic-name", "", "New Epic Name (only valid on Epic issues)")
-	editCmd.Flags().String("epic-link", "", "Epic key to associate this issue with (empty to detach)")
 }
 
 func runEdit(cmd *cobra.Command, args []string) error {
@@ -33,16 +32,23 @@ func runEdit(cmd *cobra.Command, args []string) error {
 
 	fields := make(map[string]any)
 
+	if cmd.Flags().Changed("name") {
+		epicNameID, _, err := a.EpicFieldIDs(context.Background())
+		if err != nil {
+			return err
+		}
+		v, _ := cmd.Flags().GetString("name")
+		fields[epicNameID] = v
+	}
+
 	if cmd.Flags().Changed("summary") {
 		v, _ := cmd.Flags().GetString("summary")
 		fields["summary"] = v
 	}
-
 	if cmd.Flags().Changed("description") {
 		v, _ := cmd.Flags().GetString("description")
 		fields["description"] = v
 	}
-
 	if cmd.Flags().Changed("assignee") {
 		v, _ := cmd.Flags().GetString("assignee")
 		if v == "" {
@@ -59,40 +65,19 @@ func runEdit(cmd *cobra.Command, args []string) error {
 			fields["assignee"] = models.UserRef{Name: username}
 		}
 	}
-
 	if cmd.Flags().Changed("priority") {
 		v, _ := cmd.Flags().GetString("priority")
 		fields["priority"] = models.PriorityRef{Name: v}
 	}
 
-	if cmd.Flags().Changed("epic-name") || cmd.Flags().Changed("epic-link") {
-		epicNameID, epicLinkID, err := a.EpicFieldIDs(context.Background())
-		if err != nil {
-			return err
-		}
-		if cmd.Flags().Changed("epic-name") {
-			v, _ := cmd.Flags().GetString("epic-name")
-			fields[epicNameID] = v
-		}
-		if cmd.Flags().Changed("epic-link") {
-			v, _ := cmd.Flags().GetString("epic-link")
-			if v == "" {
-				fields[epicLinkID] = nil
-			} else {
-				fields[epicLinkID] = v
-			}
-		}
-	}
-
 	if len(fields) == 0 {
-		return fmt.Errorf("no fields to update; use --summary, --description, --assignee, --priority, --epic-name, or --epic-link")
+		return fmt.Errorf("no fields to update; use --name, --summary, --description, --assignee or --priority")
 	}
 
 	req := &models.EditIssueRequest{Fields: fields}
 	if err := a.Client.EditIssue(context.Background(), key, req); err != nil {
 		return err
 	}
-
-	fmt.Printf("Updated %s\n", key)
+	fmt.Printf("Updated Epic %s\n", key)
 	return nil
 }
