@@ -215,6 +215,29 @@ jira8 mcp serve
 | `jira_edit_epic` | Edit an Epic (exposes friendly `name` for Epic Name) |
 | `jira_view_epic` | Get an Epic and (optionally) its linked children in one call |
 
+### Available MCP resources
+
+Resources expose Jira data by URI. Clients that support them (Claude Code, Gemini CLI with experimental support) let the user attach these to the conversation without spending a tool call. Clients that only do tools (LM Studio) fall back to the equivalent `jira_list_*` / `jira_get_issue` tools.
+
+| URI | Description |
+|------|-------------|
+| `jira://priorities` | Global priorities list |
+| `jira://projects/{key}/types` | Issue types valid in a project |
+| `jira://projects/{key}/statuses` | Statuses grouped by issue type |
+| `jira://issues/{key}` | Full issue payload (includes raw custom fields) |
+
+In Claude Code: reference them with `@jira:jira://...` in the prompt.
+
+### Available MCP prompts
+
+Prompts are reusable conversational templates. Claude Code surfaces them as `/mcp__jira__<name>`; Gemini CLI as `/<name>`. LM Studio does not support prompts — the equivalent workflow is to call the underlying tools directly.
+
+| Prompt | Required arguments | Purpose |
+|--------|--------------------|---------|
+| `triage_issue` | `key` | Loads an issue and asks for a structured triage (priority, missing info, labels, assignee) |
+| `create_bug_report` | `summary`, `steps_to_reproduce`, `expected_behavior`, `actual_behavior` (+ optional `environment`, `project`) | Builds a well-formed Bug report ready to file via `jira_create_issue` |
+| `epic_breakdown` | `epic_key` | Loads an Epic + its children and proposes missing stories/sub-tasks |
+
 ### Claude Code integration
 
 Add to your Claude Code MCP settings:
@@ -229,6 +252,16 @@ Add to your Claude Code MCP settings:
   }
 }
 ```
+
+### Client support matrix
+
+| Primitive | Claude Code | Gemini CLI | LM Studio |
+|-----------|:-----------:|:----------:|:---------:|
+| Tools | ✓ | ✓ | ✓ |
+| Resources | ✓ | experimental | — |
+| Prompts | ✓ | ✓ | — |
+
+Every capability exposed via Resources or Prompts is also reachable via Tools, so all three clients keep feature parity at the functional level.
 
 ## Target
 

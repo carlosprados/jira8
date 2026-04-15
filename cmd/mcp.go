@@ -36,9 +36,17 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 		"jira",
 		"1.0.0",
 		server.WithToolCapabilities(true),
+		server.WithResourceCapabilities(false, true),
+		server.WithPromptCapabilities(true),
 	)
 
 	jc := a.Client
+
+	// Register Resources and Prompts (see cmd/mcp_resources.go, cmd/mcp_prompts.go).
+	// Tools below are still registered for clients that don't support those
+	// primitives (e.g. LM Studio supports tools only).
+	registerResources(s, jc)
+	registerPrompts(s, jc, a.Config.Project)
 
 	s.AddTool(
 		mcp.NewTool("jira_list_issues",
