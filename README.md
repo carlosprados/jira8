@@ -196,7 +196,7 @@ jira8 mcp serve
 
 | Tool | Description |
 |------|-------------|
-| `jira_list_issues` | List issues (supports `issue_type`, `epic`, JQL, etc.) |
+| `jira_list_issues` | List issues (supports `type`, `epic`, JQL, etc.) |
 | `jira_get_issue` | Get issue details |
 | `jira_create_issue` | Create a new issue (supports `epic_name`, `epic_link`) |
 | `jira_edit_issue` | Edit an existing issue (supports `epic_name`, `epic_link`) |
@@ -211,7 +211,7 @@ jira8 mcp serve
 | `jira_list_priorities` | List available priorities |
 | `jira_list_epics` | List Epics in a project |
 | `jira_list_epic_children` | List issues linked to an Epic |
-| `jira_create_epic` | Create an Epic (shortcut for `jira_create_issue` with `issue_type=Epic`) |
+| `jira_create_epic` | Create an Epic (shortcut for `jira_create_issue` with `type=Epic`) |
 | `jira_edit_epic` | Edit an Epic (exposes friendly `name` for Epic Name) |
 | `jira_view_epic` | Get an Epic and (optionally) its linked children in one call |
 

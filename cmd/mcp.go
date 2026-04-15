@@ -46,10 +46,10 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 			mcp.WithString("project", mcp.Description("Project key (e.g. ESA)")),
 			mcp.WithString("status", mcp.Description("Filter by status name")),
 			mcp.WithString("assignee", mcp.Description("Filter by assignee username, use 'me' for current user")),
-			mcp.WithString("issue_type", mcp.Description("Filter by issue type (e.g. Epic, Story, Bug)")),
+			mcp.WithString("type", mcp.Description("Filter by issue type (e.g. Epic, Story, Bug)")),
 			mcp.WithString("epic", mcp.Description("Filter issues linked to this Epic key (e.g. ESA-42)")),
 			mcp.WithString("jql", mcp.Description("Raw JQL query (overrides other filters)")),
-			mcp.WithNumber("max_results", mcp.Description("Maximum number of results (default 50)")),
+			mcp.WithNumber("max", mcp.Description("Maximum number of results (default 50)")),
 		),
 		listIssuesHandler(jc, a.Config.Project),
 	)
@@ -67,12 +67,12 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 			mcp.WithDescription("Create a new Jira issue"),
 			mcp.WithString("project", mcp.Required(), mcp.Description("Project key")),
 			mcp.WithString("summary", mcp.Required(), mcp.Description("Issue summary")),
-			mcp.WithString("issue_type", mcp.Required(), mcp.Description("Issue type (e.g. Bug, Task, Story, Epic)")),
+			mcp.WithString("type", mcp.Required(), mcp.Description("Issue type (e.g. Bug, Task, Story, Epic)")),
 			mcp.WithString("description", mcp.Description("Issue description")),
 			mcp.WithString("assignee", mcp.Description("Assignee username")),
 			mcp.WithString("priority", mcp.Description("Priority name")),
 			mcp.WithString("parent", mcp.Description("Parent issue key for Sub-task creation (e.g. ESA-65)")),
-			mcp.WithString("epic_name", mcp.Description("Epic Name (required when issue_type is Epic)")),
+			mcp.WithString("epic_name", mcp.Description("Epic Name (required when type is Epic)")),
 			mcp.WithString("epic_link", mcp.Description("Epic key to associate this issue with (e.g. ESA-42)")),
 		),
 		createIssueHandler(jc),
@@ -96,7 +96,7 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 		mcp.NewTool("jira_transition_issue",
 			mcp.WithDescription("Transition a Jira issue to a new status"),
 			mcp.WithString("key", mcp.Required(), mcp.Description("Issue key (e.g. ESA-123)")),
-			mcp.WithString("transition_name", mcp.Required(), mcp.Description("Name of the transition to perform")),
+			mcp.WithString("to", mcp.Required(), mcp.Description("Name of the transition to perform")),
 		),
 		transitionIssueHandler(jc),
 	)
@@ -113,8 +113,8 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 		mcp.NewTool("jira_add_worklog",
 			mcp.WithDescription("Add a worklog entry to a Jira issue"),
 			mcp.WithString("key", mcp.Required(), mcp.Description("Issue key (e.g. ESA-123)")),
-			mcp.WithString("time_spent", mcp.Required(), mcp.Description("Time spent (e.g., 2h, 30m, 1d)")),
-			mcp.WithString("started", mcp.Description("Start date/time in ISO 8601 (optional, defaults to now)")),
+			mcp.WithString("time", mcp.Required(), mcp.Description("Time spent (e.g., 2h, 30m, 1d)")),
+			mcp.WithString("date", mcp.Description("Start date/time in ISO 8601 (optional, defaults to now)")),
 			mcp.WithString("comment", mcp.Description("Worklog comment")),
 		),
 		addWorklogHandler(jc),
@@ -173,7 +173,7 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 			mcp.WithDescription("List Epics in a project (shortcut for jira_list_issues with issuetype=Epic)"),
 			mcp.WithString("project", mcp.Description("Project key (e.g. ESA)")),
 			mcp.WithString("status", mcp.Description("Filter by status name")),
-			mcp.WithNumber("max_results", mcp.Description("Maximum number of results (default 50)")),
+			mcp.WithNumber("max", mcp.Description("Maximum number of results (default 50)")),
 		),
 		listEpicsHandler(jc, a.Config.Project),
 	)
@@ -181,15 +181,15 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 	s.AddTool(
 		mcp.NewTool("jira_list_epic_children",
 			mcp.WithDescription("List issues linked to an Epic (Epic Link = KEY)"),
-			mcp.WithString("epic_key", mcp.Required(), mcp.Description("Epic issue key (e.g. ESA-42)")),
-			mcp.WithNumber("max_results", mcp.Description("Maximum number of results (default 100)")),
+			mcp.WithString("key", mcp.Required(), mcp.Description("Epic issue key (e.g. ESA-42)")),
+			mcp.WithNumber("max", mcp.Description("Maximum number of results (default 100)")),
 		),
 		listEpicChildrenHandler(jc),
 	)
 
 	s.AddTool(
 		mcp.NewTool("jira_create_epic",
-			mcp.WithDescription("Create an Epic (ergonomic shortcut over jira_create_issue with issue_type=Epic)"),
+			mcp.WithDescription("Create an Epic (ergonomic shortcut over jira_create_issue with type=Epic)"),
 			mcp.WithString("project", mcp.Required(), mcp.Description("Project key")),
 			mcp.WithString("name", mcp.Required(), mcp.Description("Epic Name (shown on the Agile board)")),
 			mcp.WithString("summary", mcp.Required(), mcp.Description("Epic summary")),
@@ -242,12 +242,12 @@ func listIssuesHandler(jc *client.Client, defaultProject string) server.ToolHand
 				Project:  req.GetString("project", defaultProject),
 				Status:   req.GetString("status", ""),
 				Assignee: req.GetString("assignee", ""),
-				Type:     req.GetString("issue_type", ""),
+				Type:     req.GetString("type", ""),
 				Epic:     req.GetString("epic", ""),
 			})
 		}
 
-		max := req.GetInt("max_results", 50)
+		max := req.GetInt("max", 50)
 		issues, err := jc.SearchAllIssues(ctx, jql, max)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
@@ -283,7 +283,7 @@ func createIssueHandler(jc *client.Client) server.ToolHandlerFunc {
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
-		issueType, err := req.RequireString("issue_type")
+		issueType, err := req.RequireString("type")
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
@@ -292,10 +292,10 @@ func createIssueHandler(jc *client.Client) server.ToolHandlerFunc {
 		epicLink := req.GetString("epic_link", "")
 		isEpic := strings.EqualFold(issueType, "Epic")
 		if isEpic && epicName == "" {
-			return mcp.NewToolResultError("epic_name is required when issue_type is Epic"), nil
+			return mcp.NewToolResultError("epic_name is required when type is Epic"), nil
 		}
 		if epicName != "" && !isEpic {
-			return mcp.NewToolResultError("epic_name only applies when issue_type is Epic"), nil
+			return mcp.NewToolResultError("epic_name only applies when type is Epic"), nil
 		}
 
 		createReq := &models.CreateIssueRequest{
@@ -438,7 +438,7 @@ func listEpicsHandler(jc *client.Client, defaultProject string) server.ToolHandl
 			extra = append(extra, epicNameID)
 		}
 
-		max := req.GetInt("max_results", 50)
+		max := req.GetInt("max", 50)
 		issues, err := jc.SearchAllIssues(ctx, jql, max, extra...)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
@@ -450,13 +450,13 @@ func listEpicsHandler(jc *client.Client, defaultProject string) server.ToolHandl
 // listEpicChildrenHandler lists issues linked to an Epic via the Epic Link field.
 func listEpicChildrenHandler(jc *client.Client) server.ToolHandlerFunc {
 	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		key, err := req.RequireString("epic_key")
+		key, err := req.RequireString("key")
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
 		jql := client.BuildJQLWith(client.JQLFilters{Epic: key})
-		max := req.GetInt("max_results", 100)
+		max := req.GetInt("max", 100)
 		issues, err := jc.SearchAllIssues(ctx, jql, max)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
@@ -471,7 +471,7 @@ func transitionIssueHandler(jc *client.Client) server.ToolHandlerFunc {
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
-		transitionName, err := req.RequireString("transition_name")
+		transitionName, err := req.RequireString("to")
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
@@ -518,14 +518,14 @@ func addWorklogHandler(jc *client.Client) server.ToolHandlerFunc {
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
-		timeSpent, err := req.RequireString("time_spent")
+		timeSpent, err := req.RequireString("time")
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
 		wlReq := &models.AddWorklogRequest{
 			TimeSpent: timeSpent,
-			Started:   req.GetString("started", ""),
+			Started:   req.GetString("date", ""),
 			Comment:   req.GetString("comment", ""),
 		}
 
