@@ -137,6 +137,15 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 	)
 
 	s.AddTool(
+		mcp.NewTool("jira_delete_worklog",
+			mcp.WithDescription("Delete a worklog entry from a Jira issue"),
+			mcp.WithString("key", mcp.Required(), mcp.Description("Issue key (e.g. ESA-123)")),
+			mcp.WithString("worklog_id", mcp.Required(), mcp.Description("Worklog ID")),
+		),
+		deleteWorklogHandler(jc),
+	)
+
+	s.AddTool(
 		mcp.NewTool("jira_add_comment",
 			mcp.WithDescription("Add a comment to a Jira issue"),
 			mcp.WithString("key", mcp.Required(), mcp.Description("Issue key (e.g. ESA-123)")),
@@ -559,6 +568,25 @@ func listWorklogsHandler(jc *client.Client) server.ToolHandlerFunc {
 		}
 
 		return mcp.NewToolResultText(toJSON(worklogs)), nil
+	}
+}
+
+func deleteWorklogHandler(jc *client.Client) server.ToolHandlerFunc {
+	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		key, err := req.RequireString("key")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		worklogID, err := req.RequireString("worklog_id")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		if err := jc.DeleteWorklog(ctx, key, worklogID); err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		return mcp.NewToolResultText(fmt.Sprintf(`{"deleted": "%s", "issue": "%s"}`, worklogID, key)), nil
 	}
 }
 

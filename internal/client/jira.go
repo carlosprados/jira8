@@ -276,6 +276,13 @@ func (c *Client) GetWorklogs(ctx context.Context, key string) ([]models.Worklog,
 	return resp.Worklogs, nil
 }
 
+// DeleteWorklog removes a worklog entry from an issue.
+func (c *Client) DeleteWorklog(ctx context.Context, key, worklogID string) error {
+	path := "/issue/" + url.PathEscape(key) + "/worklog/" + url.PathEscape(worklogID)
+	_, err := c.do(ctx, http.MethodDelete, path, nil)
+	return err
+}
+
 // AddComment adds a comment to an issue.
 func (c *Client) AddComment(ctx context.Context, key string, req *models.AddCommentRequest) (*models.Comment, error) {
 	data, err := c.do(ctx, http.MethodPost, "/issue/"+url.PathEscape(key)+"/comment", req)
