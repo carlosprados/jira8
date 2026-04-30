@@ -11,6 +11,10 @@ package cmd
 //   jira://projects/{key}/types             — issue types valid for a project
 //   jira://projects/{key}/statuses          — statuses grouped by issue type
 //   jira://issues/{key}                     — full issue payload (Jira raw JSON)
+//   jira://issues/{key}/comments            — comment thread on an issue
+//   jira://issues/{key}/worklogs            — worklog entries on an issue
+//   jira://issues/{key}/transitions         — workflow transitions available now
+//   jira://epics/{key}/children             — issues linked to an Epic
 //
 // Handlers return application/json so AI agents can parse without re-tokenising.
 
@@ -24,7 +28,7 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// registerResources installs the four jira:// resources/templates on s.
+// registerResources installs the jira:// resources/templates on s.
 func registerResources(s *server.MCPServer, jc *client.Client) {
 	s.AddResource(
 		mcp.NewResource(
@@ -64,6 +68,46 @@ func registerResources(s *server.MCPServer, jc *client.Client) {
 			mcp.WithTemplateMIMEType("application/json"),
 		),
 		issueResourceHandler(jc),
+	)
+
+	s.AddResourceTemplate(
+		mcp.NewResourceTemplate(
+			"jira://issues/{key}/comments",
+			"Issue comments",
+			mcp.WithTemplateDescription("Comment thread on a Jira issue, ordered as returned by Jira"),
+			mcp.WithTemplateMIMEType("application/json"),
+		),
+		issueCommentsResourceHandler(jc),
+	)
+
+	s.AddResourceTemplate(
+		mcp.NewResourceTemplate(
+			"jira://issues/{key}/worklogs",
+			"Issue worklogs",
+			mcp.WithTemplateDescription("Worklog entries logged against a Jira issue (author, duration, started date, comment)"),
+			mcp.WithTemplateMIMEType("application/json"),
+		),
+		issueWorklogsResourceHandler(jc),
+	)
+
+	s.AddResourceTemplate(
+		mcp.NewResourceTemplate(
+			"jira://issues/{key}/transitions",
+			"Issue transitions",
+			mcp.WithTemplateDescription("Workflow transitions available right now for an issue, given its current status"),
+			mcp.WithTemplateMIMEType("application/json"),
+		),
+		issueTransitionsResourceHandler(jc),
+	)
+
+	s.AddResourceTemplate(
+		mcp.NewResourceTemplate(
+			"jira://epics/{key}/children",
+			"Epic children",
+			mcp.WithTemplateDescription("Issues linked to an Epic via Epic Link (stories, sub-tasks, bugs)"),
+			mcp.WithTemplateMIMEType("application/json"),
+		),
+		epicChildrenResourceHandler(jc),
 	)
 }
 
@@ -116,6 +160,63 @@ func issueResourceHandler(jc *client.Client) server.ResourceTemplateHandlerFunc 
 			return nil, err
 		}
 		return jsonResource(req.Params.URI, issue)
+	}
+}
+
+func issueCommentsResourceHandler(jc *client.Client) server.ResourceTemplateHandlerFunc {
+	return func(ctx context.Context, req mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+		key, err := templateString(req, "key")
+		if err != nil {
+			return nil, err
+		}
+		comments, err := jc.GetComments(ctx, key)
+		if err != nil {
+			return nil, err
+		}
+		return jsonResource(req.Params.URI, comments)
+	}
+}
+
+func issueWorklogsResourceHandler(jc *client.Client) server.ResourceTemplateHandlerFunc {
+	return func(ctx context.Context, req mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+		key, err := templateString(req, "key")
+		if err != nil {
+			return nil, err
+		}
+		worklogs, err := jc.GetWorklogs(ctx, key)
+		if err != nil {
+			return nil, err
+		}
+		return jsonResource(req.Params.URI, worklogs)
+	}
+}
+
+func issueTransitionsResourceHandler(jc *client.Client) server.ResourceTemplateHandlerFunc {
+	return func(ctx context.Context, req mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+		key, err := templateString(req, "key")
+		if err != nil {
+			return nil, err
+		}
+		transitions, err := jc.GetTransitions(ctx, key)
+		if err != nil {
+			return nil, err
+		}
+		return jsonResource(req.Params.URI, transitions)
+	}
+}
+
+func epicChildrenResourceHandler(jc *client.Client) server.ResourceTemplateHandlerFunc {
+	return func(ctx context.Context, req mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+		key, err := templateString(req, "key")
+		if err != nil {
+			return nil, err
+		}
+		jql := client.BuildJQLWith(client.JQLFilters{Epic: key})
+		children, err := jc.SearchAllIssues(ctx, jql, 100)
+		if err != nil {
+			return nil, err
+		}
+		return jsonResource(req.Params.URI, children)
 	}
 }
 

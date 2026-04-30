@@ -204,8 +204,11 @@ jira8 mcp serve
 | `jira_list_transitions` | List available transitions |
 | `jira_add_comment` | Add a comment |
 | `jira_list_comments` | List comments |
+| `jira_edit_comment` | Edit an existing comment |
+| `jira_delete_comment` | Delete a comment |
 | `jira_add_worklog` | Add a worklog entry |
 | `jira_list_worklogs` | List worklog entries |
+| `jira_delete_worklog` | Delete a worklog entry |
 | `jira_list_issue_types` | List issue types for a project |
 | `jira_list_statuses` | List statuses grouped by issue type |
 | `jira_list_priorities` | List available priorities |
@@ -225,6 +228,10 @@ Resources expose Jira data by URI. Clients that support them (Claude Code, Gemin
 | `jira://projects/{key}/types` | Issue types valid in a project |
 | `jira://projects/{key}/statuses` | Statuses grouped by issue type |
 | `jira://issues/{key}` | Full issue payload (includes raw custom fields) |
+| `jira://issues/{key}/comments` | Comment thread on an issue |
+| `jira://issues/{key}/worklogs` | Worklog entries on an issue |
+| `jira://issues/{key}/transitions` | Workflow transitions available right now |
+| `jira://epics/{key}/children` | Issues linked to an Epic via Epic Link |
 
 In Claude Code: reference them with `@jira:jira://...` in the prompt.
 
@@ -237,10 +244,17 @@ Prompts are reusable conversational templates. Claude Code surfaces them as `/mc
 | `triage_issue` | `key` | Loads an issue and asks for a structured triage (priority, missing info, labels, assignee) |
 | `create_bug_report` | `summary`, `steps_to_reproduce`, `expected_behavior`, `actual_behavior` (+ optional `environment`, `project`) | Builds a well-formed Bug report ready to file via `jira_create_issue` |
 | `epic_breakdown` | `epic_key` | Loads an Epic + its children and proposes missing stories/sub-tasks |
+| `summarise_comments` | `key` | Loads an issue's comment thread and extracts decisions, open questions and pending actions |
 
 ### Claude Code integration
 
-Add to your Claude Code MCP settings:
+Add the server with the `claude` CLI (recommended):
+
+```bash
+claude mcp add jira /path/to/jira8 mcp serve
+```
+
+Or, edit `.mcp.json` (project) / `~/.claude.json` (user) by hand:
 
 ```json
 {
@@ -252,6 +266,47 @@ Add to your Claude Code MCP settings:
   }
 }
 ```
+
+After adding, run `/mcp` inside Claude Code to verify the server shows up
+and lists tools, resources and prompts.
+
+### Claude Desktop integration
+
+Edit Claude Desktop's MCP config and add the same server entry:
+
+- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+- Linux: `~/.config/Claude/claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "jira": {
+      "command": "/path/to/jira8",
+      "args": ["mcp", "serve"]
+    }
+  }
+}
+```
+
+Restart Claude Desktop after editing. The Jira tools, resources and prompts
+will appear in the connectors panel.
+
+> **Tip — credentials.** The MCP server inherits the same configuration as
+> the CLI: `~/.jira.yaml`, `JIRA_*` environment variables, or flags. To pass
+> credentials only to the MCP server, add an `env` block:
+>
+> ```json
+> {
+>   "mcpServers": {
+>     "jira": {
+>       "command": "/path/to/jira8",
+>       "args": ["mcp", "serve"],
+>       "env": { "JIRA_TOKEN": "...", "JIRA_URL": "https://jira.example.com/jira" }
+>     }
+>   }
+> }
+> ```
 
 ### Client support matrix
 
