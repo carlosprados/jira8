@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/amplia/jira8/cmd/app"
+	"github.com/amplia/jira8/cmd/epic"
 	"github.com/amplia/jira8/cmd/issue"
 	"github.com/amplia/jira8/cmd/project"
 	"github.com/amplia/jira8/internal/client"
@@ -62,6 +63,7 @@ func init() {
 	rootCmd.SetVersionTemplate(fmt.Sprintf("jira8 %s (commit: %s, built: %s)\n", version, commit, date))
 
 	rootCmd.AddCommand(issue.IssueCmd)
+	rootCmd.AddCommand(epic.EpicCmd)
 	rootCmd.AddCommand(project.ProjectCmd)
 	rootCmd.AddCommand(mcpCmd)
 }

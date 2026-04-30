@@ -16,7 +16,7 @@ var transitionCmd = &cobra.Command{
 	Short:   "Transition an issue to a new status",
 	Example: "  jira8 issue transition ESA-123 --to \"Done\"",
 	Args:    cobra.ExactArgs(1),
-	RunE:  runTransition,
+	RunE:    runTransition,
 }
 
 var transitionsCmd = &cobra.Command{
@@ -24,7 +24,7 @@ var transitionsCmd = &cobra.Command{
 	Short:   "List available transitions for an issue",
 	Example: "  jira8 issue transitions ESA-123",
 	Args:    cobra.ExactArgs(1),
-	RunE:  runTransitions,
+	RunE:    runTransitions,
 }
 
 func init() {

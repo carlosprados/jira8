@@ -14,16 +14,17 @@ var viewCmd = &cobra.Command{
 	Short:   "View issue details",
 	Example: "  jira8 issue view ESA-123",
 	Args:    cobra.ExactArgs(1),
-	RunE:  runView,
+	RunE:    runView,
 }
 
 func runView(cmd *cobra.Command, args []string) error {
-	issue, err := app.Get().Client.GetIssue(context.Background(), args[0])
+	a := app.Get()
+	issue, err := a.Client.GetIssue(context.Background(), args[0])
 	if err != nil {
 		return err
 	}
 
-	if app.Get().Output == "json" {
+	if a.Output == "json" {
 		data, err := json.MarshalIndent(issue, "", "  ")
 		if err != nil {
 			return err
@@ -32,6 +33,9 @@ func runView(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	printIssueDetail(issue)
+	// Resolve Epic custom field IDs best-effort so view can render Epic Name /
+	// Epic Link. A failure here is non-fatal — we still render the rest.
+	epicNameID, epicLinkID, _ := a.EpicFieldIDs(context.Background())
+	printIssueDetailWithEpic(issue, epicNameID, epicLinkID)
 	return nil
 }

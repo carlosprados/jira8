@@ -21,6 +21,12 @@ const (
 	maxRetries  = 3
 	pageSize    = 50
 	apiBasePath = "/rest/api/2"
+
+	// Jira Server 8 schema identifiers for Greenhopper (Agile) custom fields.
+	// These are stable across instances; the numeric customfield_XXXXX IDs are NOT,
+	// which is why we resolve them dynamically via GET /field.
+	SchemaEpicName = "com.pyxis.greenhopper.jira:gh-epic-label"
+	SchemaEpicLink = "com.pyxis.greenhopper.jira:gh-epic-link"
 )
 
 // APIError represents a Jira API error with status code and messages.
@@ -132,10 +138,18 @@ func (c *Client) do(ctx context.Context, method, path string, body any) ([]byte,
 	return nil, fmt.Errorf("max retries exceeded")
 }
 
-// SearchIssues searches for issues using JQL.
-func (c *Client) SearchIssues(ctx context.Context, jql string, startAt, maxResults int) (*models.SearchResult, error) {
-	path := fmt.Sprintf("/search?jql=%s&startAt=%d&maxResults=%d&fields=summary,status,assignee,priority,issuetype,project,created,updated",
-		url.QueryEscape(jql), startAt, maxResults)
+// defaultSearchFields is the baseline field set fetched by search queries.
+var defaultSearchFields = []string{"summary", "status", "assignee", "priority", "issuetype", "project", "created", "updated"}
+
+// SearchIssues searches for issues using JQL. extraFields, if non-empty, is appended
+// to the default field set (e.g. resolved Epic Link/Name custom field IDs).
+func (c *Client) SearchIssues(ctx context.Context, jql string, startAt, maxResults int, extraFields ...string) (*models.SearchResult, error) {
+	fields := defaultSearchFields
+	if len(extraFields) > 0 {
+		fields = append(append([]string{}, defaultSearchFields...), extraFields...)
+	}
+	path := fmt.Sprintf("/search?jql=%s&startAt=%d&maxResults=%d&fields=%s",
+		url.QueryEscape(jql), startAt, maxResults, strings.Join(fields, ","))
 
 	data, err := c.do(ctx, http.MethodGet, path, nil)
 	if err != nil {
@@ -151,7 +165,7 @@ func (c *Client) SearchIssues(ctx context.Context, jql string, startAt, maxResul
 
 // SearchAllIssues fetches all issues matching JQL with automatic pagination.
 // If max <= 0, fetches all results.
-func (c *Client) SearchAllIssues(ctx context.Context, jql string, max int) ([]models.Issue, error) {
+func (c *Client) SearchAllIssues(ctx context.Context, jql string, max int, extraFields ...string) ([]models.Issue, error) {
 	var all []models.Issue
 	startAt := 0
 
@@ -161,7 +175,7 @@ func (c *Client) SearchAllIssues(ctx context.Context, jql string, max int) ([]mo
 			perPage = max - len(all)
 		}
 
-		result, err := c.SearchIssues(ctx, jql, startAt, perPage)
+		result, err := c.SearchIssues(ctx, jql, startAt, perPage, extraFields...)
 		if err != nil {
 			return nil, err
 		}
@@ -365,26 +379,93 @@ func (c *Client) GetPriorities(ctx context.Context) ([]models.Priority, error) {
 	return result, nil
 }
 
-// BuildJQL constructs a JQL query from individual filter parameters.
+// JQLFilters groups the individual filter inputs accepted by BuildJQL.
+// Fields are optional — empty values are skipped.
+type JQLFilters struct {
+	Project  string
+	Status   string
+	Assignee string
+	Epic     string // issue key whose Epic Link equals this value
+	Type     string // issue type name (e.g. "Epic", "Story")
+}
+
+// BuildJQL constructs a JQL query from the provided filters.
+// Use BuildJQLWith for the full filter set; this variant is kept for compatibility
+// and covers project/status/assignee only.
 func BuildJQL(project, status, assignee string) string {
+	return BuildJQLWith(JQLFilters{Project: project, Status: status, Assignee: assignee})
+}
+
+// BuildJQLWith constructs a JQL query from a JQLFilters struct.
+func BuildJQLWith(f JQLFilters) string {
 	var clauses []string
 
-	if project != "" {
-		clauses = append(clauses, fmt.Sprintf("project = %s", project))
+	if f.Project != "" {
+		clauses = append(clauses, fmt.Sprintf("project = %s", f.Project))
 	}
-	if status != "" {
-		clauses = append(clauses, fmt.Sprintf("status = \"%s\"", status))
+	if f.Status != "" {
+		clauses = append(clauses, fmt.Sprintf("status = \"%s\"", f.Status))
 	}
-	if assignee != "" {
-		if strings.EqualFold(assignee, "me") {
+	if f.Assignee != "" {
+		if strings.EqualFold(f.Assignee, "me") {
 			clauses = append(clauses, "assignee = currentUser()")
 		} else {
-			clauses = append(clauses, fmt.Sprintf("assignee = \"%s\"", assignee))
+			clauses = append(clauses, fmt.Sprintf("assignee = \"%s\"", f.Assignee))
 		}
+	}
+	if f.Type != "" {
+		clauses = append(clauses, fmt.Sprintf("issuetype = \"%s\"", f.Type))
+	}
+	if f.Epic != "" {
+		clauses = append(clauses, fmt.Sprintf("\"Epic Link\" = %s", f.Epic))
 	}
 
 	if len(clauses) == 0 {
 		return "ORDER BY updated DESC"
 	}
 	return strings.Join(clauses, " AND ") + " ORDER BY updated DESC"
+}
+
+// GetFields returns all field descriptors from the Jira instance (system + custom).
+// Used to discover custom field IDs dynamically (e.g. Epic Name, Epic Link) since
+// they vary between instances.
+func (c *Client) GetFields(ctx context.Context) ([]models.Field, error) {
+	data, err := c.do(ctx, http.MethodGet, "/field", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var fields []models.Field
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return nil, fmt.Errorf("parsing fields: %w", err)
+	}
+	return fields, nil
+}
+
+// ResolveEpicFields returns the customfield_XXXXX IDs for Epic Name and Epic Link
+// on this Jira instance, by querying /field and matching on schema.custom.
+// Returns an error if either is not found (the Agile/Greenhopper plugin is likely
+// not installed).
+func (c *Client) ResolveEpicFields(ctx context.Context) (epicNameID, epicLinkID string, err error) {
+	fields, err := c.GetFields(ctx)
+	if err != nil {
+		return "", "", err
+	}
+
+	for _, f := range fields {
+		if f.Schema == nil {
+			continue
+		}
+		switch f.Schema.Custom {
+		case SchemaEpicName:
+			epicNameID = f.ID
+		case SchemaEpicLink:
+			epicLinkID = f.ID
+		}
+	}
+
+	if epicNameID == "" || epicLinkID == "" {
+		return "", "", fmt.Errorf("epic fields not found on this Jira instance (Epic Name: %q, Epic Link: %q); is the Agile/Greenhopper plugin installed?", epicNameID, epicLinkID)
+	}
+	return epicNameID, epicLinkID, nil
 }
