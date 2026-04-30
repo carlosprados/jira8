@@ -95,3 +95,52 @@ func TestTriageIssuePrompt_MissingKey(t *testing.T) {
 		t.Fatal("expected error on missing key, got nil")
 	}
 }
+
+func TestSummariseCommentsPrompt_EmbedsComments(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/rest/api/2/issue/TEST-1/comment"):
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"total": 2,
+				"comments": []map[string]any{
+					{"id": "1", "body": "we should ship friday", "created": "2026-04-29T10:00:00Z", "author": map[string]any{"displayName": "Alice"}},
+					{"id": "2", "body": "agreed, blocked on infra", "created": "2026-04-29T11:00:00Z", "author": map[string]any{"displayName": "Bob"}},
+				},
+			})
+		case strings.HasSuffix(r.URL.Path, "/rest/api/2/issue/TEST-1"):
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"id": "1", "key": "TEST-1",
+				"fields": map[string]any{"summary": "Release prep"},
+			})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	jc := client.New(&config.Config{URL: srv.URL, Token: "x"})
+	handler := summariseCommentsPromptHandler(jc)
+	req := mcp.GetPromptRequest{}
+	req.Params.Arguments = map[string]string{"key": "TEST-1"}
+
+	res, err := handler(context.Background(), req)
+	if err != nil {
+		t.Fatalf("handler: %v", err)
+	}
+	tc := res.Messages[0].Content.(mcp.TextContent)
+	for _, want := range []string{"Release prep", "Alice", "Bob", "ship friday", "Decisions taken", "Open questions"} {
+		if !strings.Contains(tc.Text, want) {
+			t.Errorf("summarise_comments prompt missing %q in:\n%s", want, tc.Text)
+		}
+	}
+}
+
+func TestSummariseCommentsPrompt_MissingKey(t *testing.T) {
+	jc := client.New(&config.Config{URL: "http://unused", Token: "x"})
+	handler := summariseCommentsPromptHandler(jc)
+	req := mcp.GetPromptRequest{}
+	req.Params.Arguments = map[string]string{}
+	if _, err := handler(context.Background(), req); err == nil {
+		t.Fatal("expected error on missing key, got nil")
+	}
+}

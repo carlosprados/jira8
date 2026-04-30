@@ -50,6 +50,14 @@ func registerPrompts(s *server.MCPServer, jc *client.Client, defaultProject stri
 		),
 		epicBreakdownPromptHandler(jc),
 	)
+
+	s.AddPrompt(
+		mcp.NewPrompt("summarise_comments",
+			mcp.WithPromptDescription("Load the comment thread of an issue and summarise decisions, open questions and pending actions"),
+			mcp.WithArgument("key", mcp.RequiredArgument(), mcp.ArgumentDescription("Issue key whose comment thread should be summarised (e.g. ESA-123)")),
+		),
+		summariseCommentsPromptHandler(jc),
+	)
 }
 
 func triageIssuePromptHandler(jc *client.Client) server.PromptHandlerFunc {
@@ -179,6 +187,56 @@ func epicBreakdownPromptHandler(jc *client.Client) server.PromptHandlerFunc {
 			mcp.NewPromptMessage(mcp.RoleUser, mcp.NewTextContent(b.String()+"\n"+instructions)),
 		}
 		return mcp.NewGetPromptResult(fmt.Sprintf("Breakdown of Epic %s", key), messages), nil
+	}
+}
+
+func summariseCommentsPromptHandler(jc *client.Client) server.PromptHandlerFunc {
+	return func(ctx context.Context, req mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+		key := req.Params.Arguments["key"]
+		if key == "" {
+			return nil, fmt.Errorf("argument 'key' is required")
+		}
+
+		issue, err := jc.GetIssue(ctx, key)
+		if err != nil {
+			return nil, fmt.Errorf("loading %s: %w", key, err)
+		}
+		comments, err := jc.GetComments(ctx, key)
+		if err != nil {
+			return nil, fmt.Errorf("loading comments of %s: %w", key, err)
+		}
+
+		var b strings.Builder
+		b.WriteString(summariseIssueForPrompt(issue))
+		b.WriteString(fmt.Sprintf("\nComments (%d):\n", len(comments)))
+		if len(comments) == 0 {
+			b.WriteString("  (none)\n")
+		}
+		for _, c := range comments {
+			author := "?"
+			if c.Author != nil {
+				author = c.Author.DisplayName
+				if author == "" {
+					author = c.Author.Name
+				}
+			}
+			body := strings.ReplaceAll(c.Body, "\n", " ")
+			b.WriteString(fmt.Sprintf("  - [%s] %s — %s\n", c.Created, author, body))
+		}
+
+		instructions := strings.Join([]string{
+			"Summarise the comment thread above. Produce:",
+			"  1. Decisions taken (with the comment author and date that locked them in).",
+			"  2. Open questions that nobody has answered yet.",
+			"  3. Pending actions, with owner if mentioned.",
+			"  4. A one-line current status of the issue based purely on the thread.",
+			"Be terse. Quote literally only when the wording matters. If a section has nothing, write \"n/a\".",
+		}, "\n")
+
+		messages := []mcp.PromptMessage{
+			mcp.NewPromptMessage(mcp.RoleUser, mcp.NewTextContent(b.String()+"\n"+instructions)),
+		}
+		return mcp.NewGetPromptResult(fmt.Sprintf("Comment summary of %s", key), messages), nil
 	}
 }
 
