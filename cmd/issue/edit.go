@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/amplia/jira8/cmd/app"
+	"github.com/amplia/jira8/internal/markup"
 	"github.com/amplia/jira8/internal/models"
 	"github.com/spf13/cobra"
 )
@@ -25,6 +26,7 @@ func init() {
 	editCmd.Flags().String("priority", "", "New priority")
 	editCmd.Flags().String("epic-name", "", "New Epic Name (only valid on Epic issues)")
 	editCmd.Flags().String("epic-link", "", "Epic key to associate this issue with (empty to detach)")
+	editCmd.Flags().Bool("markdown", false, "Treat --description as Markdown and convert to Jira Wiki Markup before sending")
 }
 
 func runEdit(cmd *cobra.Command, args []string) error {
@@ -40,6 +42,9 @@ func runEdit(cmd *cobra.Command, args []string) error {
 
 	if cmd.Flags().Changed("description") {
 		v, _ := cmd.Flags().GetString("description")
+		if md, _ := cmd.Flags().GetBool("markdown"); md {
+			v = markup.MarkdownToWiki(v)
+		}
 		fields["description"] = v
 	}
 

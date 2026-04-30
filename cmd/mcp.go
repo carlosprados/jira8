@@ -8,6 +8,7 @@ import (
 
 	"github.com/amplia/jira8/cmd/app"
 	"github.com/amplia/jira8/internal/client"
+	"github.com/amplia/jira8/internal/markup"
 	"github.com/amplia/jira8/internal/models"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -82,6 +83,7 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 			mcp.WithString("parent", mcp.Description("Parent issue key for Sub-task creation (e.g. ESA-65)")),
 			mcp.WithString("epic_name", mcp.Description("Epic Name (required when type is Epic)")),
 			mcp.WithString("epic_link", mcp.Description("Epic key to associate this issue with (e.g. ESA-42)")),
+			mcp.WithString("format", mcp.Description(formatParamDescription)),
 		),
 		createIssueHandler(jc),
 	)
@@ -96,6 +98,7 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 			mcp.WithString("priority", mcp.Description("New priority name")),
 			mcp.WithString("epic_name", mcp.Description("New Epic Name (only for Epics)")),
 			mcp.WithString("epic_link", mcp.Description("New Epic key to link to (empty string to detach)")),
+			mcp.WithString("format", mcp.Description(formatParamDescription)),
 		),
 		editIssueHandler(jc),
 	)
@@ -124,6 +127,7 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 			mcp.WithString("time", mcp.Required(), mcp.Description("Time spent (e.g., 2h, 30m, 1d)")),
 			mcp.WithString("date", mcp.Description("Start date/time in ISO 8601 (optional, defaults to now)")),
 			mcp.WithString("comment", mcp.Description("Worklog comment")),
+			mcp.WithString("format", mcp.Description(formatParamDescription)),
 		),
 		addWorklogHandler(jc),
 	)
@@ -150,6 +154,7 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 			mcp.WithDescription("Add a comment to a Jira issue"),
 			mcp.WithString("key", mcp.Required(), mcp.Description("Issue key (e.g. ESA-123)")),
 			mcp.WithString("body", mcp.Required(), mcp.Description("Comment body text")),
+			mcp.WithString("format", mcp.Description(formatParamDescription)),
 		),
 		addCommentHandler(jc),
 	)
@@ -167,7 +172,8 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 			mcp.WithDescription("Edit an existing comment on a Jira issue"),
 			mcp.WithString("key", mcp.Required(), mcp.Description("Issue key (e.g. ESA-123)")),
 			mcp.WithString("comment_id", mcp.Required(), mcp.Description("Comment ID")),
-			mcp.WithString("body", mcp.Required(), mcp.Description("Updated comment body (wiki markup)")),
+			mcp.WithString("body", mcp.Required(), mcp.Description("Updated comment body (wiki markup unless format=markdown)")),
+			mcp.WithString("format", mcp.Description(formatParamDescription)),
 		),
 		editCommentHandler(jc),
 	)
@@ -232,6 +238,7 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 			mcp.WithString("description", mcp.Description("Epic description")),
 			mcp.WithString("assignee", mcp.Description("Assignee username (use 'me' for current user)")),
 			mcp.WithString("priority", mcp.Description("Priority name")),
+			mcp.WithString("format", mcp.Description(formatParamDescription)),
 		),
 		createEpicHandler(jc),
 	)
@@ -245,6 +252,7 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 			mcp.WithString("description", mcp.Description("New description")),
 			mcp.WithString("assignee", mcp.Description("New assignee username (empty to unassign)")),
 			mcp.WithString("priority", mcp.Description("New priority name")),
+			mcp.WithString("format", mcp.Description(formatParamDescription)),
 		),
 		editEpicHandler(jc),
 	)
@@ -261,6 +269,23 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 
 	return server.ServeStdio(s)
 }
+
+// maybeConvertMarkdown returns text converted from Markdown to Jira Wiki
+// Markup when the MCP `format` argument is "markdown" (case-insensitive). Any
+// other value (default "wiki") returns the text unchanged. Used by tools that
+// accept free-form rich text (description, comment body, worklog comment) so
+// AI agents emitting Markdown natively can opt into conversion per-call.
+func maybeConvertMarkdown(text, format string) string {
+	if text == "" {
+		return text
+	}
+	if strings.EqualFold(format, "markdown") {
+		return markup.MarkdownToWiki(text)
+	}
+	return text
+}
+
+const formatParamDescription = `Input format for free-form text fields ("wiki" default, or "markdown" to convert from Markdown to Jira Wiki Markup before sending)`
 
 func toJSON(v any) string {
 	data, err := json.MarshalIndent(v, "", "  ")
@@ -334,12 +359,13 @@ func createIssueHandler(jc *client.Client) server.ToolHandlerFunc {
 			return mcp.NewToolResultError("epic_name only applies when type is Epic"), nil
 		}
 
+		format := req.GetString("format", "")
 		createReq := &models.CreateIssueRequest{
 			Fields: models.CreateIssueFields{
 				Project:     models.ProjectRef{Key: project},
 				Summary:     summary,
 				IssueType:   models.TypeRef{Name: issueType},
-				Description: req.GetString("description", ""),
+				Description: maybeConvertMarkdown(req.GetString("description", ""), format),
 			},
 		}
 
@@ -394,13 +420,15 @@ func editIssueHandler(jc *client.Client) server.ToolHandlerFunc {
 		}
 
 		args := req.GetArguments()
+		format := req.GetString("format", "")
 		fields := make(map[string]any)
 
 		if v, ok := args["summary"]; ok {
 			fields["summary"] = v
 		}
 		if v, ok := args["description"]; ok {
-			fields["description"] = v
+			s, _ := v.(string)
+			fields["description"] = maybeConvertMarkdown(s, format)
 		}
 		if v, ok := args["assignee"]; ok {
 			assignee, _ := v.(string)
@@ -562,7 +590,7 @@ func addWorklogHandler(jc *client.Client) server.ToolHandlerFunc {
 		wlReq := &models.AddWorklogRequest{
 			TimeSpent: timeSpent,
 			Started:   req.GetString("date", ""),
-			Comment:   req.GetString("comment", ""),
+			Comment:   maybeConvertMarkdown(req.GetString("comment", ""), req.GetString("format", "")),
 		}
 
 		wl, err := jc.AddWorklog(ctx, key, wlReq)
@@ -619,6 +647,7 @@ func addCommentHandler(jc *client.Client) server.ToolHandlerFunc {
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
+		body = maybeConvertMarkdown(body, req.GetString("format", ""))
 
 		comment, err := jc.AddComment(ctx, key, &models.AddCommentRequest{Body: body})
 		if err != nil {
@@ -659,6 +688,7 @@ func editCommentHandler(jc *client.Client) server.ToolHandlerFunc {
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
+		body = maybeConvertMarkdown(body, req.GetString("format", ""))
 
 		comment, err := jc.EditComment(ctx, key, commentID, body)
 		if err != nil {
@@ -774,7 +804,7 @@ func createEpicHandler(jc *client.Client) server.ToolHandlerFunc {
 				Project:     models.ProjectRef{Key: project},
 				Summary:     summary,
 				IssueType:   models.TypeRef{Name: "Epic"},
-				Description: req.GetString("description", ""),
+				Description: maybeConvertMarkdown(req.GetString("description", ""), req.GetString("format", "")),
 				Extra:       map[string]any{epicNameID: name},
 			},
 		}
@@ -812,6 +842,7 @@ func editEpicHandler(jc *client.Client) server.ToolHandlerFunc {
 		}
 
 		args := req.GetArguments()
+		format := req.GetString("format", "")
 		fields := make(map[string]any)
 
 		if v, ok := args["name"]; ok {
@@ -826,7 +857,8 @@ func editEpicHandler(jc *client.Client) server.ToolHandlerFunc {
 			fields["summary"] = v
 		}
 		if v, ok := args["description"]; ok {
-			fields["description"] = v
+			s, _ := v.(string)
+			fields["description"] = maybeConvertMarkdown(s, format)
 		}
 		if v, ok := args["assignee"]; ok {
 			assignee, _ := v.(string)
