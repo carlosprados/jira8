@@ -145,9 +145,11 @@ type Comments struct {
 
 // Comment represents a single comment.
 type Comment struct {
+	ID      string `json:"id"`
 	Author  *User  `json:"author"`
 	Body    string `json:"body"`
 	Created string `json:"created"`
+	Updated string `json:"updated,omitempty"`
 }
 
 // AddCommentRequest is the POST body for /rest/api/2/issue/{key}/comment.

@@ -20,4 +20,5 @@ func init() {
 	IssueCmd.AddCommand(worklogListCmd)
 	IssueCmd.AddCommand(commentAddCmd)
 	IssueCmd.AddCommand(commentListCmd)
+	IssueCmd.AddCommand(commentEditCmd)
 }

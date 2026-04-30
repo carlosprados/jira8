@@ -290,6 +290,21 @@ func (c *Client) AddComment(ctx context.Context, key string, req *models.AddComm
 	return &comment, nil
 }
 
+// EditComment updates an existing comment on an issue.
+func (c *Client) EditComment(ctx context.Context, key, commentID, body string) (*models.Comment, error) {
+	path := "/issue/" + url.PathEscape(key) + "/comment/" + url.PathEscape(commentID)
+	data, err := c.do(ctx, http.MethodPut, path, &models.AddCommentRequest{Body: body})
+	if err != nil {
+		return nil, err
+	}
+
+	var comment models.Comment
+	if err := json.Unmarshal(data, &comment); err != nil {
+		return nil, fmt.Errorf("parsing comment response: %w", err)
+	}
+	return &comment, nil
+}
+
 // GetComments returns all comments for an issue.
 func (c *Client) GetComments(ctx context.Context, key string) ([]models.Comment, error) {
 	data, err := c.do(ctx, http.MethodGet, "/issue/"+url.PathEscape(key)+"/comment", nil)

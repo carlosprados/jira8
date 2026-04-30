@@ -48,7 +48,7 @@ func runCommentList(cmd *cobra.Command, args []string) error {
 		if len(created) > 10 {
 			created = created[:10]
 		}
-		fmt.Printf("\n  %s  %s\n", headerStyle.Render(userName(c.Author)), labelStyle.Render(created))
+		fmt.Printf("\n  %s  %s  %s\n", labelStyle.Render("#"+c.ID), headerStyle.Render(userName(c.Author)), labelStyle.Render(created))
 		for _, line := range strings.Split(c.Body, "\n") {
 			fmt.Printf("  %s\n", line)
 		}
