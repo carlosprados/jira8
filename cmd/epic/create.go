@@ -24,6 +24,7 @@ func init() {
 	createCmd.Flags().String("summary", "", "Epic summary (required)")
 	createCmd.Flags().String("project", "", "Project key (default from config)")
 	createCmd.Flags().String("description", "", "Epic description")
+	createCmd.Flags().String("description-file", "", "Read description from file (use - for stdin)")
 	createCmd.Flags().String("assignee", "", "Assignee username (use 'me' for current user)")
 	createCmd.Flags().String("priority", "", "Priority name")
 	createCmd.Flags().Bool("markdown", false, "Treat --description as Markdown and convert to Jira Wiki Markup before sending")
@@ -41,7 +42,10 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	if project == "" {
 		project = a.Config.Project
 	}
-	description, _ := cmd.Flags().GetString("description")
+	description, _, err := app.ReadTextInput(cmd, "description", "description-file")
+	if err != nil {
+		return err
+	}
 	if md, _ := cmd.Flags().GetBool("markdown"); md {
 		description = markup.MarkdownToWiki(description)
 	}

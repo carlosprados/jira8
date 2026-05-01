@@ -21,10 +21,10 @@ var commentEditCmd = &cobra.Command{
 
 func init() {
 	commentEditCmd.Flags().String("id", "", "Comment ID (required)")
-	commentEditCmd.Flags().String("body", "", "Updated comment body (required)")
+	commentEditCmd.Flags().String("body", "", "Updated comment body (required, or use --body-file)")
+	commentEditCmd.Flags().String("body-file", "", "Read updated body from file (use - for stdin)")
 	commentEditCmd.Flags().Bool("markdown", false, "Treat --body as Markdown and convert to Jira Wiki Markup before sending")
 	_ = commentEditCmd.MarkFlagRequired("id")
-	_ = commentEditCmd.MarkFlagRequired("body")
 }
 
 func runCommentEdit(cmd *cobra.Command, args []string) error {
@@ -32,7 +32,13 @@ func runCommentEdit(cmd *cobra.Command, args []string) error {
 	key := args[0]
 
 	commentID, _ := cmd.Flags().GetString("id")
-	body, _ := cmd.Flags().GetString("body")
+	body, set, err := app.ReadTextInput(cmd, "body", "body-file")
+	if err != nil {
+		return err
+	}
+	if !set || body == "" {
+		return fmt.Errorf("comment body is required (use --body or --body-file)")
+	}
 	if md, _ := cmd.Flags().GetBool("markdown"); md {
 		body = markup.MarkdownToWiki(body)
 	}

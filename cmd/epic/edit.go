@@ -23,6 +23,7 @@ func init() {
 	editCmd.Flags().String("name", "", "New Epic Name")
 	editCmd.Flags().String("summary", "", "New summary")
 	editCmd.Flags().String("description", "", "New description")
+	editCmd.Flags().String("description-file", "", "Read new description from file (use - for stdin)")
 	editCmd.Flags().String("assignee", "", "New assignee (use 'me' for current user, empty to unassign)")
 	editCmd.Flags().String("priority", "", "New priority")
 	editCmd.Flags().Bool("markdown", false, "Treat --description as Markdown and convert to Jira Wiki Markup before sending")
@@ -47,8 +48,9 @@ func runEdit(cmd *cobra.Command, args []string) error {
 		v, _ := cmd.Flags().GetString("summary")
 		fields["summary"] = v
 	}
-	if cmd.Flags().Changed("description") {
-		v, _ := cmd.Flags().GetString("description")
+	if v, set, err := app.ReadTextInput(cmd, "description", "description-file"); err != nil {
+		return err
+	} else if set {
 		if md, _ := cmd.Flags().GetBool("markdown"); md {
 			v = markup.MarkdownToWiki(v)
 		}
