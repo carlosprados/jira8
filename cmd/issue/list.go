@@ -25,6 +25,7 @@ func init() {
 	listCmd.Flags().String("epic", "", "Filter by parent Epic key (issues linked to this Epic)")
 	listCmd.Flags().String("jql", "", "Raw JQL query (overrides other filters)")
 	listCmd.Flags().Int("max", 50, "Maximum number of results")
+	listCmd.Flags().Bool("markdown", false, "Convert description fields from Jira Wiki Markup to Markdown")
 }
 
 func runList(cmd *cobra.Command, args []string) error {
@@ -51,6 +52,10 @@ func runList(cmd *cobra.Command, args []string) error {
 	issues, err := app.Get().Client.SearchAllIssues(context.Background(), jql, max)
 	if err != nil {
 		return err
+	}
+
+	if md, _ := cmd.Flags().GetBool("markdown"); md {
+		app.RenderIssuesAsMarkdown(issues)
 	}
 
 	if app.Get().Output == "json" {

@@ -22,6 +22,7 @@ func init() {
 	listCmd.Flags().String("project", "", "Project key (default from config)")
 	listCmd.Flags().String("status", "", "Filter by status")
 	listCmd.Flags().Int("max", 50, "Maximum number of results")
+	listCmd.Flags().Bool("markdown", false, "Convert description fields from Jira Wiki Markup to Markdown")
 }
 
 func runList(cmd *cobra.Command, args []string) error {
@@ -51,6 +52,10 @@ func runList(cmd *cobra.Command, args []string) error {
 	issues, err := a.Client.SearchAllIssues(context.Background(), jql, max, extra...)
 	if err != nil {
 		return err
+	}
+
+	if md, _ := cmd.Flags().GetBool("markdown"); md {
+		app.RenderIssuesAsMarkdown(issues)
 	}
 
 	if a.Output == "json" {

@@ -20,6 +20,7 @@ var childrenCmd = &cobra.Command{
 
 func init() {
 	childrenCmd.Flags().Int("max", 100, "Maximum number of results")
+	childrenCmd.Flags().Bool("markdown", false, "Convert description fields from Jira Wiki Markup to Markdown")
 }
 
 func runChildren(cmd *cobra.Command, args []string) error {
@@ -31,6 +32,10 @@ func runChildren(cmd *cobra.Command, args []string) error {
 	issues, err := a.Client.SearchAllIssues(context.Background(), jql, max)
 	if err != nil {
 		return err
+	}
+
+	if md, _ := cmd.Flags().GetBool("markdown"); md {
+		app.RenderIssuesAsMarkdown(issues)
 	}
 
 	if a.Output == "json" {

@@ -19,6 +19,10 @@ var commentListCmd = &cobra.Command{
 	RunE:    runCommentList,
 }
 
+func init() {
+	commentListCmd.Flags().Bool("markdown", false, "Convert comment bodies from Jira Wiki Markup to Markdown")
+}
+
 func runCommentList(cmd *cobra.Command, args []string) error {
 	a := app.Get()
 	key := args[0]
@@ -26,6 +30,10 @@ func runCommentList(cmd *cobra.Command, args []string) error {
 	comments, err := a.Client.GetComments(context.Background(), key)
 	if err != nil {
 		return err
+	}
+
+	if md, _ := cmd.Flags().GetBool("markdown"); md {
+		app.RenderCommentsAsMarkdown(comments)
 	}
 
 	if a.Output == "json" {

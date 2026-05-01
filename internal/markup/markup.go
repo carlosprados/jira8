@@ -16,6 +16,7 @@ package markup
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -256,6 +257,214 @@ func splitTableRow(s string) []string {
 	t = strings.TrimPrefix(t, "|")
 	t = strings.TrimSuffix(t, "|")
 	parts := strings.Split(t, "|")
+	for i, p := range parts {
+		parts[i] = strings.TrimSpace(p)
+	}
+	return parts
+}
+
+// WikiToMarkdown converts a Jira Server 8 Wiki Markup string into Markdown.
+// Empty input returns the empty string unchanged. The conversion is
+// best-effort: elements with no clean Markdown equivalent (anchors, color
+// macros, panels, {toc}, …) are left literal in the output.
+//
+// AI agent context: this is the inverse of MarkdownToWiki. Together they let a
+// caller live in Markdown end-to-end (publish in Markdown, read back in
+// Markdown). Round-trip on the supported subset is approximately lossless.
+func WikiToMarkdown(s string) string {
+	if s == "" {
+		return ""
+	}
+
+	lines := strings.Split(s, "\n")
+	out := make([]string, 0, len(lines))
+
+	inFence := false
+	inQuote := false
+	inTable := false
+
+	for i := 0; i < len(lines); i++ {
+		line := lines[i]
+
+		if inFence {
+			if wikiCodeCloseRe.MatchString(line) {
+				inFence = false
+				out = append(out, "```")
+				continue
+			}
+			out = append(out, line)
+			continue
+		}
+		if m := wikiCodeOpenRe.FindStringSubmatch(line); m != nil {
+			inFence = true
+			out = append(out, "```"+m[1])
+			continue
+		}
+
+		if inQuote {
+			if wikiQuoteCloseRe.MatchString(line) {
+				inQuote = false
+				continue
+			}
+			out = append(out, "> "+transformInlineWiki(line))
+			continue
+		}
+		if wikiQuoteOpenRe.MatchString(line) {
+			inQuote = true
+			continue
+		}
+
+		if isWikiTableHeader(line) {
+			cells := splitWikiTableHeader(line)
+			for j, c := range cells {
+				cells[j] = transformInlineWiki(c)
+			}
+			out = append(out, "| "+strings.Join(cells, " | ")+" |")
+			seps := make([]string, len(cells))
+			for j := range seps {
+				seps[j] = "---"
+			}
+			out = append(out, "| "+strings.Join(seps, " | ")+" |")
+			inTable = true
+			continue
+		}
+		if inTable && isWikiTableRow(line) {
+			cells := splitTableRow(line)
+			for j, c := range cells {
+				cells[j] = transformInlineWiki(c)
+			}
+			out = append(out, "| "+strings.Join(cells, " | ")+" |")
+			continue
+		}
+		if inTable {
+			inTable = false
+		}
+
+		if wikiHRRe.MatchString(line) {
+			out = append(out, "---")
+			continue
+		}
+
+		if m := wikiHeadingRe.FindStringSubmatch(line); m != nil {
+			level, _ := strconv.Atoi(m[1])
+			out = append(out, strings.Repeat("#", level)+" "+transformInlineWiki(m[2]))
+			continue
+		}
+
+		if rest, ok := strings.CutPrefix(line, "bq. "); ok {
+			out = append(out, "> "+transformInlineWiki(rest))
+			continue
+		}
+		if line == "bq." {
+			out = append(out, ">")
+			continue
+		}
+
+		if m := wikiBulletListRe.FindStringSubmatch(line); m != nil {
+			depth := len(m[1])
+			indent := strings.Repeat("  ", depth-1)
+			out = append(out, indent+"- "+transformInlineWiki(m[2]))
+			continue
+		}
+		if m := wikiNumberedListRe.FindStringSubmatch(line); m != nil {
+			depth := len(m[1])
+			indent := strings.Repeat("  ", depth-1)
+			out = append(out, indent+"1. "+transformInlineWiki(m[2]))
+			continue
+		}
+
+		out = append(out, transformInlineWiki(line))
+	}
+
+	return strings.Join(out, "\n")
+}
+
+var (
+	wikiCodeOpenRe     = regexp.MustCompile(`^\{code(?::([A-Za-z0-9_+\-]*))?\}\s*$`)
+	wikiCodeCloseRe    = regexp.MustCompile(`^\{code\}\s*$`)
+	wikiQuoteOpenRe    = regexp.MustCompile(`^\{quote\}\s*$`)
+	wikiQuoteCloseRe   = regexp.MustCompile(`^\{quote\}\s*$`)
+	wikiHeadingRe      = regexp.MustCompile(`^h([1-6])\.\s+(.*)$`)
+	wikiBulletListRe   = regexp.MustCompile(`^(\*+)\s+(.*)$`)
+	wikiNumberedListRe = regexp.MustCompile(`^(#+)\s+(.*)$`)
+	wikiHRRe           = regexp.MustCompile(`^-{4,}\s*$`)
+
+	wikiInlineCodeRe = regexp.MustCompile(`\{\{([^}\n]+)\}\}`)
+	wikiBoldRe       = regexp.MustCompile(`(^|[^\w*])\*([^*\n]+)\*([^\w*]|$)`)
+	wikiItalicRe     = regexp.MustCompile(`(^|[^\w_])_([^_\n]+)_([^\w_]|$)`)
+	wikiStrikeRe     = regexp.MustCompile(`(^|[^\w-])-(\S[^-\n]*\S|\S)-([^\w-]|$)`)
+	wikiLinkRe       = regexp.MustCompile(`\[([^\]|\n]+)\|([^\]\n]+)\]`)
+	wikiImageRe      = regexp.MustCompile(`!([^!\s\n|]+)!`)
+
+	wikiCodePlaceholderRe = regexp.MustCompile(`\x00W(\d+)\x00`)
+	wikiBoldPlaceholderRe = regexp.MustCompile(`\x00X(\d+)\x00`)
+)
+
+// transformInlineWiki applies inline conversions to a single Wiki line.
+// Inline code spans are extracted to placeholders first to avoid being
+// re-processed; bold spans are also placeholdered so the italic/strike passes
+// can use simple regexes without ambiguity.
+func transformInlineWiki(s string) string {
+	if s == "" {
+		return s
+	}
+
+	var codes []string
+	s = wikiInlineCodeRe.ReplaceAllStringFunc(s, func(m string) string {
+		inner := m[2 : len(m)-2]
+		idx := len(codes)
+		codes = append(codes, inner)
+		return fmt.Sprintf("\x00W%d\x00", idx)
+	})
+
+	var bolds []string
+	s = wikiBoldRe.ReplaceAllStringFunc(s, func(m string) string {
+		sub := wikiBoldRe.FindStringSubmatch(m)
+		idx := len(bolds)
+		bolds = append(bolds, sub[2])
+		return sub[1] + fmt.Sprintf("\x00X%d\x00", idx) + sub[3]
+	})
+
+	s = wikiItalicRe.ReplaceAllString(s, "${1}*${2}*${3}")
+	s = wikiStrikeRe.ReplaceAllString(s, "${1}~~${2}~~${3}")
+	s = wikiLinkRe.ReplaceAllString(s, "[${1}](${2})")
+	s = wikiImageRe.ReplaceAllString(s, "![${1}](${1})")
+
+	s = wikiBoldPlaceholderRe.ReplaceAllStringFunc(s, func(m string) string {
+		var idx int
+		fmt.Sscanf(m, "\x00X%d\x00", &idx)
+		return "**" + bolds[idx] + "**"
+	})
+	s = wikiCodePlaceholderRe.ReplaceAllStringFunc(s, func(m string) string {
+		var idx int
+		fmt.Sscanf(m, "\x00W%d\x00", &idx)
+		return "`" + codes[idx] + "`"
+	})
+
+	return s
+}
+
+func isWikiTableHeader(s string) bool {
+	t := strings.TrimSpace(s)
+	return strings.HasPrefix(t, "||") && strings.HasSuffix(t, "||") && len(t) >= 4
+}
+
+func isWikiTableRow(s string) bool {
+	t := strings.TrimSpace(s)
+	if len(t) < 2 {
+		return false
+	}
+	if strings.HasPrefix(t, "||") {
+		return false
+	}
+	return strings.HasPrefix(t, "|") && strings.HasSuffix(t, "|")
+}
+
+func splitWikiTableHeader(s string) []string {
+	t := strings.TrimSpace(s)
+	t = strings.TrimPrefix(t, "||")
+	t = strings.TrimSuffix(t, "||")
+	parts := strings.Split(t, "||")
 	for i, p := range parts {
 		parts[i] = strings.TrimSpace(p)
 	}

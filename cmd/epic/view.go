@@ -23,6 +23,7 @@ var viewCmd = &cobra.Command{
 func init() {
 	viewCmd.Flags().Bool("no-children", false, "Skip fetching child issues")
 	viewCmd.Flags().Int("max-children", 100, "Maximum children to fetch")
+	viewCmd.Flags().Bool("markdown", false, "Convert description fields from Jira Wiki Markup to Markdown")
 }
 
 func runView(cmd *cobra.Command, args []string) error {
@@ -46,6 +47,11 @@ func runView(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("fetching children: %w", err)
 		}
+	}
+
+	if md, _ := cmd.Flags().GetBool("markdown"); md {
+		app.RenderIssueAsMarkdown(issue)
+		app.RenderIssuesAsMarkdown(children)
 	}
 
 	if a.Output == "json" {
