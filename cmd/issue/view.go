@@ -17,11 +17,19 @@ var viewCmd = &cobra.Command{
 	RunE:    runView,
 }
 
+func init() {
+	viewCmd.Flags().Bool("markdown", false, "Convert description and comment bodies from Jira Wiki Markup to Markdown")
+}
+
 func runView(cmd *cobra.Command, args []string) error {
 	a := app.Get()
 	issue, err := a.Client.GetIssue(context.Background(), args[0])
 	if err != nil {
 		return err
+	}
+
+	if md, _ := cmd.Flags().GetBool("markdown"); md {
+		app.RenderIssueAsMarkdown(issue)
 	}
 
 	if a.Output == "json" {

@@ -18,6 +18,10 @@ var worklogListCmd = &cobra.Command{
 	RunE:    runWorklogList,
 }
 
+func init() {
+	worklogListCmd.Flags().Bool("markdown", false, "Convert worklog comments from Jira Wiki Markup to Markdown")
+}
+
 func runWorklogList(cmd *cobra.Command, args []string) error {
 	a := app.Get()
 	key := args[0]
@@ -25,6 +29,10 @@ func runWorklogList(cmd *cobra.Command, args []string) error {
 	worklogs, err := a.Client.GetWorklogs(context.Background(), key)
 	if err != nil {
 		return err
+	}
+
+	if md, _ := cmd.Flags().GetBool("markdown"); md {
+		app.RenderWorklogsAsMarkdown(worklogs)
 	}
 
 	if a.Output == "json" {

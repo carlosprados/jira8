@@ -59,6 +59,7 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 			mcp.WithString("epic", mcp.Description("Filter issues linked to this Epic key (e.g. ESA-42)")),
 			mcp.WithString("jql", mcp.Description("Raw JQL query (overrides other filters)")),
 			mcp.WithNumber("max", mcp.Description("Maximum number of results (default 50)")),
+			mcp.WithString("format", mcp.Description(formatParamDescription)),
 		),
 		listIssuesHandler(jc, a.Config.Project),
 	)
@@ -67,6 +68,7 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 		mcp.NewTool("jira_get_issue",
 			mcp.WithDescription("Get detailed information about a Jira issue"),
 			mcp.WithString("key", mcp.Required(), mcp.Description("Issue key (e.g. ESA-123)")),
+			mcp.WithString("format", mcp.Description(formatParamDescription)),
 		),
 		getIssueHandler(jc),
 	)
@@ -136,6 +138,7 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 		mcp.NewTool("jira_list_worklogs",
 			mcp.WithDescription("List worklog entries for a Jira issue"),
 			mcp.WithString("key", mcp.Required(), mcp.Description("Issue key (e.g. ESA-123)")),
+			mcp.WithString("format", mcp.Description(formatParamDescription)),
 		),
 		listWorklogsHandler(jc),
 	)
@@ -163,6 +166,7 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 		mcp.NewTool("jira_list_comments",
 			mcp.WithDescription("List comments on a Jira issue"),
 			mcp.WithString("key", mcp.Required(), mcp.Description("Issue key (e.g. ESA-123)")),
+			mcp.WithString("format", mcp.Description(formatParamDescription)),
 		),
 		listCommentsHandler(jc),
 	)
@@ -216,6 +220,7 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 			mcp.WithString("project", mcp.Description("Project key (e.g. ESA)")),
 			mcp.WithString("status", mcp.Description("Filter by status name")),
 			mcp.WithNumber("max", mcp.Description("Maximum number of results (default 50)")),
+			mcp.WithString("format", mcp.Description(formatParamDescription)),
 		),
 		listEpicsHandler(jc, a.Config.Project),
 	)
@@ -225,6 +230,7 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 			mcp.WithDescription("List issues linked to an Epic (Epic Link = KEY)"),
 			mcp.WithString("key", mcp.Required(), mcp.Description("Epic issue key (e.g. ESA-42)")),
 			mcp.WithNumber("max", mcp.Description("Maximum number of results (default 100)")),
+			mcp.WithString("format", mcp.Description(formatParamDescription)),
 		),
 		listEpicChildrenHandler(jc),
 	)
@@ -263,6 +269,7 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 			mcp.WithString("key", mcp.Required(), mcp.Description("Epic issue key (e.g. ESA-42)")),
 			mcp.WithBoolean("include_children", mcp.Description("Include linked children in the response (default true)")),
 			mcp.WithNumber("max_children", mcp.Description("Maximum children to return (default 100)")),
+			mcp.WithString("format", mcp.Description(formatParamDescription)),
 		),
 		viewEpicHandler(jc),
 	)
@@ -283,6 +290,13 @@ func maybeConvertMarkdown(text, format string) string {
 		return markup.MarkdownToWiki(text)
 	}
 	return text
+}
+
+// isMarkdownFormat reports whether the MCP `format` argument requests Markdown
+// output. Used by read tools to decide whether to convert Wiki→Markdown on
+// returned descriptions, comment bodies and worklog comments before responding.
+func isMarkdownFormat(format string) bool {
+	return strings.EqualFold(format, "markdown")
 }
 
 const formatParamDescription = `Input format for free-form text fields ("wiki" default, or "markdown" to convert from Markdown to Jira Wiki Markup before sending)`
@@ -314,6 +328,10 @@ func listIssuesHandler(jc *client.Client, defaultProject string) server.ToolHand
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
+		if isMarkdownFormat(req.GetString("format", "")) {
+			app.RenderIssuesAsMarkdown(issues)
+		}
+
 		return mcp.NewToolResultText(toJSON(issues)), nil
 	}
 }
@@ -328,6 +346,10 @@ func getIssueHandler(jc *client.Client) server.ToolHandlerFunc {
 		issue, err := jc.GetIssue(ctx, key)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		if isMarkdownFormat(req.GetString("format", "")) {
+			app.RenderIssueAsMarkdown(issue)
 		}
 
 		return mcp.NewToolResultText(toJSON(issue)), nil
@@ -507,6 +529,9 @@ func listEpicsHandler(jc *client.Client, defaultProject string) server.ToolHandl
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
+		if isMarkdownFormat(req.GetString("format", "")) {
+			app.RenderIssuesAsMarkdown(issues)
+		}
 		return mcp.NewToolResultText(toJSON(issues)), nil
 	}
 }
@@ -524,6 +549,9 @@ func listEpicChildrenHandler(jc *client.Client) server.ToolHandlerFunc {
 		issues, err := jc.SearchAllIssues(ctx, jql, max)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
+		}
+		if isMarkdownFormat(req.GetString("format", "")) {
+			app.RenderIssuesAsMarkdown(issues)
 		}
 		return mcp.NewToolResultText(toJSON(issues)), nil
 	}
@@ -614,6 +642,10 @@ func listWorklogsHandler(jc *client.Client) server.ToolHandlerFunc {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
+		if isMarkdownFormat(req.GetString("format", "")) {
+			app.RenderWorklogsAsMarkdown(worklogs)
+		}
+
 		return mcp.NewToolResultText(toJSON(worklogs)), nil
 	}
 }
@@ -668,6 +700,10 @@ func listCommentsHandler(jc *client.Client) server.ToolHandlerFunc {
 		comments, err := jc.GetComments(ctx, key)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		if isMarkdownFormat(req.GetString("format", "")) {
+			app.RenderCommentsAsMarkdown(comments)
 		}
 
 		return mcp.NewToolResultText(toJSON(comments)), nil
@@ -914,6 +950,11 @@ func viewEpicHandler(jc *client.Client) server.ToolHandlerFunc {
 			if err != nil {
 				return mcp.NewToolResultError(fmt.Sprintf("fetching children: %s", err)), nil
 			}
+		}
+
+		if isMarkdownFormat(req.GetString("format", "")) {
+			app.RenderIssueAsMarkdown(issue)
+			app.RenderIssuesAsMarkdown(children)
 		}
 
 		out := struct {
