@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/amplia/jira8/cmd/app"
+	"github.com/amplia/jira8/internal/markup"
 	"github.com/amplia/jira8/internal/models"
 	"github.com/spf13/cobra"
 )
@@ -21,6 +22,7 @@ var commentAddCmd = &cobra.Command{
 
 func init() {
 	commentAddCmd.Flags().String("body", "", "Comment body (required)")
+	commentAddCmd.Flags().Bool("markdown", false, "Treat --body as Markdown and convert to Jira Wiki Markup before sending")
 	_ = commentAddCmd.MarkFlagRequired("body")
 }
 
@@ -29,6 +31,9 @@ func runCommentAdd(cmd *cobra.Command, args []string) error {
 	key := args[0]
 
 	body, _ := cmd.Flags().GetString("body")
+	if md, _ := cmd.Flags().GetBool("markdown"); md {
+		body = markup.MarkdownToWiki(body)
+	}
 
 	comment, err := a.Client.AddComment(context.Background(), key, &models.AddCommentRequest{
 		Body: body,

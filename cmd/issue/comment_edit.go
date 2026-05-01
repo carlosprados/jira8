@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/amplia/jira8/cmd/app"
+	"github.com/amplia/jira8/internal/markup"
 	"github.com/spf13/cobra"
 )
 
@@ -21,6 +22,7 @@ var commentEditCmd = &cobra.Command{
 func init() {
 	commentEditCmd.Flags().String("id", "", "Comment ID (required)")
 	commentEditCmd.Flags().String("body", "", "Updated comment body (required)")
+	commentEditCmd.Flags().Bool("markdown", false, "Treat --body as Markdown and convert to Jira Wiki Markup before sending")
 	_ = commentEditCmd.MarkFlagRequired("id")
 	_ = commentEditCmd.MarkFlagRequired("body")
 }
@@ -31,6 +33,9 @@ func runCommentEdit(cmd *cobra.Command, args []string) error {
 
 	commentID, _ := cmd.Flags().GetString("id")
 	body, _ := cmd.Flags().GetString("body")
+	if md, _ := cmd.Flags().GetBool("markdown"); md {
+		body = markup.MarkdownToWiki(body)
+	}
 
 	comment, err := a.Client.EditComment(context.Background(), key, commentID, body)
 	if err != nil {

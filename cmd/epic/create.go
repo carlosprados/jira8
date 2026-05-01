@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/amplia/jira8/cmd/app"
+	"github.com/amplia/jira8/internal/markup"
 	"github.com/amplia/jira8/internal/models"
 	"github.com/spf13/cobra"
 )
@@ -25,6 +26,7 @@ func init() {
 	createCmd.Flags().String("description", "", "Epic description")
 	createCmd.Flags().String("assignee", "", "Assignee username (use 'me' for current user)")
 	createCmd.Flags().String("priority", "", "Priority name")
+	createCmd.Flags().Bool("markdown", false, "Treat --description as Markdown and convert to Jira Wiki Markup before sending")
 
 	_ = createCmd.MarkFlagRequired("name")
 	_ = createCmd.MarkFlagRequired("summary")
@@ -40,6 +42,9 @@ func runCreate(cmd *cobra.Command, args []string) error {
 		project = a.Config.Project
 	}
 	description, _ := cmd.Flags().GetString("description")
+	if md, _ := cmd.Flags().GetBool("markdown"); md {
+		description = markup.MarkdownToWiki(description)
+	}
 	assignee, _ := cmd.Flags().GetString("assignee")
 	priority, _ := cmd.Flags().GetString("priority")
 
