@@ -185,6 +185,18 @@ func printIssueDetailWithEpic(issue *models.Issue, epicNameID, epicLinkID string
 		fmt.Println(f.Description)
 	}
 
+	if len(f.Attachment) > 0 {
+		fmt.Println()
+		fmt.Printf(labelStyle.Render("Attachments (%d):")+"\n", len(f.Attachment))
+		for _, att := range f.Attachment {
+			fmt.Printf("  %s  %s  %s\n",
+				labelStyle.Render("#"+att.ID),
+				att.Filename,
+				labelStyle.Render(humanSize(att.Size)),
+			)
+		}
+	}
+
 	if f.Comment != nil && len(f.Comment.Comments) > 0 {
 		fmt.Println()
 		fmt.Printf(labelStyle.Render("Comments (%d):")+"\n", f.Comment.Total)
@@ -204,6 +216,20 @@ func printIssueDetailWithEpic(issue *models.Issue, epicNameID, epicLinkID string
 	}
 
 	fmt.Println()
+}
+
+// humanSize renders a byte count as a short human-readable string (e.g. "12.3 KB").
+func humanSize(n int64) string {
+	const unit = 1024
+	if n < unit {
+		return fmt.Sprintf("%d B", n)
+	}
+	div, exp := int64(unit), 0
+	for x := n / unit; x >= unit; x /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB", float64(n)/float64(div), "KMGTPE"[exp])
 }
 
 func printField(label, value string) {

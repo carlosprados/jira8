@@ -85,6 +85,10 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 			mcp.WithString("parent", mcp.Description("Parent issue key for Sub-task creation (e.g. ESA-65)")),
 			mcp.WithString("epic_name", mcp.Description("Epic Name (required when type is Epic)")),
 			mcp.WithString("epic_link", mcp.Description("Epic key to associate this issue with (e.g. ESA-42)")),
+			mcp.WithArray("attachments",
+				mcp.WithStringItems(),
+				mcp.Description("Optional list of file paths to attach after creation. Paths are read on the host running this MCP server, not on the agent's client machine."),
+			),
 			mcp.WithString("format", mcp.Description(formatParamDescription)),
 		),
 		createIssueHandler(jc),
@@ -100,6 +104,10 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 			mcp.WithString("priority", mcp.Description("New priority name")),
 			mcp.WithString("epic_name", mcp.Description("New Epic Name (only for Epics)")),
 			mcp.WithString("epic_link", mcp.Description("New Epic key to link to (empty string to detach)")),
+			mcp.WithArray("attachments",
+				mcp.WithStringItems(),
+				mcp.Description("Optional list of file paths to attach (uploaded after the field update). Paths are read on the host running this MCP server."),
+			),
 			mcp.WithString("format", mcp.Description(formatParamDescription)),
 		),
 		editIssueHandler(jc),
@@ -189,6 +197,35 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 			mcp.WithString("comment_id", mcp.Required(), mcp.Description("Comment ID")),
 		),
 		deleteCommentHandler(jc),
+	)
+
+	s.AddTool(
+		mcp.NewTool("jira_add_attachment",
+			mcp.WithDescription("Upload one or more files to a Jira issue. Paths are read on the host running this MCP server, not on the agent's client machine — agents should pass paths reachable from that host."),
+			mcp.WithString("key", mcp.Required(), mcp.Description("Issue key (e.g. ESA-123)")),
+			mcp.WithArray("paths",
+				mcp.Required(),
+				mcp.WithStringItems(),
+				mcp.Description("List of file paths to upload"),
+			),
+		),
+		addAttachmentHandler(jc),
+	)
+
+	s.AddTool(
+		mcp.NewTool("jira_list_attachments",
+			mcp.WithDescription("List attachments on a Jira issue"),
+			mcp.WithString("key", mcp.Required(), mcp.Description("Issue key (e.g. ESA-123)")),
+		),
+		listAttachmentsHandler(jc),
+	)
+
+	s.AddTool(
+		mcp.NewTool("jira_delete_attachment",
+			mcp.WithDescription("Delete an attachment by its ID (numeric, as returned by jira_list_attachments)"),
+			mcp.WithString("attachment_id", mcp.Required(), mcp.Description("Attachment ID")),
+		),
+		deleteAttachmentHandler(jc),
 	)
 
 	s.AddTool(
@@ -300,6 +337,28 @@ func isMarkdownFormat(format string) bool {
 }
 
 const formatParamDescription = `Input format for free-form text fields ("wiki" default, or "markdown" to convert from Markdown to Jira Wiki Markup before sending)`
+
+// getStringArray extracts a []string from the MCP request arguments under name.
+// MCP transports an array param as []any, so we narrow it element by element
+// and ignore non-string entries to be tolerant of loose agent encodings.
+func getStringArray(req mcp.CallToolRequest, name string) []string {
+	args := req.GetArguments()
+	raw, ok := args[name]
+	if !ok {
+		return nil
+	}
+	arr, ok := raw.([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(arr))
+	for _, v := range arr {
+		if s, ok := v.(string); ok && s != "" {
+			out = append(out, s)
+		}
+	}
+	return out
+}
 
 func toJSON(v any) string {
 	data, err := json.MarshalIndent(v, "", "  ")
@@ -430,6 +489,21 @@ func createIssueHandler(jc *client.Client) server.ToolHandlerFunc {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
+		// Attachments go in a follow-up multipart call; Jira's /issue endpoint
+		// does not accept files. Failure is reported with the created key so
+		// callers can retry with jira_add_attachment.
+		if paths := getStringArray(req, "attachments"); len(paths) > 0 {
+			uploaded, err := jc.AddAttachments(ctx, resp.Key, paths)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("created %s but failed to upload attachments: %s", resp.Key, err)), nil
+			}
+			out := struct {
+				*models.CreateIssueResponse
+				Attachments []models.Attachment `json:"attachments"`
+			}{CreateIssueResponse: resp, Attachments: uploaded}
+			return mcp.NewToolResultText(toJSON(out)), nil
+		}
+
 		return mcp.NewToolResultText(toJSON(resp)), nil
 	}
 }
@@ -494,16 +568,77 @@ func editIssueHandler(jc *client.Client) server.ToolHandlerFunc {
 			}
 		}
 
-		if len(fields) == 0 {
+		paths := getStringArray(req, "attachments")
+		if len(fields) == 0 && len(paths) == 0 {
 			return mcp.NewToolResultError("no fields to update"), nil
 		}
 
-		editReq := &models.EditIssueRequest{Fields: fields}
-		if err := jc.EditIssue(ctx, key, editReq); err != nil {
-			return mcp.NewToolResultError(err.Error()), nil
+		if len(fields) > 0 {
+			editReq := &models.EditIssueRequest{Fields: fields}
+			if err := jc.EditIssue(ctx, key, editReq); err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+		}
+
+		if len(paths) > 0 {
+			uploaded, err := jc.AddAttachments(ctx, key, paths)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("editing %s: %s", key, err)), nil
+			}
+			out := struct {
+				Updated     string              `json:"updated"`
+				Attachments []models.Attachment `json:"attachments"`
+			}{Updated: key, Attachments: uploaded}
+			return mcp.NewToolResultText(toJSON(out)), nil
 		}
 
 		return mcp.NewToolResultText(fmt.Sprintf(`{"updated": "%s"}`, key)), nil
+	}
+}
+
+func addAttachmentHandler(jc *client.Client) server.ToolHandlerFunc {
+	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		key, err := req.RequireString("key")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		paths := getStringArray(req, "paths")
+		if len(paths) == 0 {
+			return mcp.NewToolResultError("paths: at least one file path is required"), nil
+		}
+
+		attachments, err := jc.AddAttachments(ctx, key, paths)
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		return mcp.NewToolResultText(toJSON(attachments)), nil
+	}
+}
+
+func listAttachmentsHandler(jc *client.Client) server.ToolHandlerFunc {
+	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		key, err := req.RequireString("key")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		attachments, err := jc.ListAttachments(ctx, key)
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		return mcp.NewToolResultText(toJSON(attachments)), nil
+	}
+}
+
+func deleteAttachmentHandler(jc *client.Client) server.ToolHandlerFunc {
+	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		id, err := req.RequireString("attachment_id")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		if err := jc.DeleteAttachment(ctx, id); err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		return mcp.NewToolResultText(fmt.Sprintf(`{"deleted": "%s"}`, id)), nil
 	}
 }
 

@@ -169,6 +169,25 @@ jira8 issue worklog-add MYPROJ-123 --time 2h --comment "Investig."   # add a wor
 jira8 issue worklog-add MYPROJ-123 --time 30m --date 2026-04-15T09:00:00.000+0200
 ```
 
+### Attachments
+
+```bash
+jira8 issue attachment add MYPROJ-123 diag.png trace.log       # upload one or more files
+jira8 issue attachment list MYPROJ-123                         # list attachments
+jira8 issue attachment delete 45821                            # delete by attachment ID
+
+# Or attach at create/edit time:
+jira8 issue create --summary "Crash on login" --type Bug \
+    --attach screenshot.png --attach trace.log
+jira8 issue edit MYPROJ-123 --attach extra-evidence.pdf        # adjuntar sin tocar otros campos
+```
+
+Uploads stream from disk so large files do not get buffered in memory. The
+upload step is separate from create/edit (Jira's `/issue` endpoint does not
+accept files) and is not transactional: if the issue is created but the upload
+fails, you get back the new key and the upload error so you can retry with
+`issue attachment add`.
+
 ### Project metadata
 
 Query valid values for issue types, statuses, and priorities:
@@ -198,8 +217,8 @@ jira8 mcp serve
 |------|-------------|
 | `jira_list_issues` | List issues (supports `type`, `epic`, JQL, etc.) |
 | `jira_get_issue` | Get issue details |
-| `jira_create_issue` | Create a new issue (supports `epic_name`, `epic_link`) |
-| `jira_edit_issue` | Edit an existing issue (supports `epic_name`, `epic_link`) |
+| `jira_create_issue` | Create a new issue (supports `epic_name`, `epic_link`, `attachments[]`) |
+| `jira_edit_issue` | Edit an existing issue (supports `epic_name`, `epic_link`, `attachments[]`) |
 | `jira_transition_issue` | Transition an issue |
 | `jira_list_transitions` | List available transitions |
 | `jira_add_comment` | Add a comment |
@@ -209,6 +228,9 @@ jira8 mcp serve
 | `jira_add_worklog` | Add a worklog entry |
 | `jira_list_worklogs` | List worklog entries |
 | `jira_delete_worklog` | Delete a worklog entry |
+| `jira_add_attachment` | Upload one or more files to an issue |
+| `jira_list_attachments` | List attachments on an issue |
+| `jira_delete_attachment` | Delete an attachment by ID |
 | `jira_list_issue_types` | List issue types for a project |
 | `jira_list_statuses` | List statuses grouped by issue type |
 | `jira_list_priorities` | List available priorities |
@@ -217,6 +239,15 @@ jira8 mcp serve
 | `jira_create_epic` | Create an Epic (shortcut for `jira_create_issue` with `type=Epic`) |
 | `jira_edit_epic` | Edit an Epic (exposes friendly `name` for Epic Name) |
 | `jira_view_epic` | Get an Epic and (optionally) its linked children in one call |
+
+> **Attachment paths and MCP security.** `jira_add_attachment`, and the
+> `attachments[]` parameters on `jira_create_issue` / `jira_edit_issue`, read
+> files from the filesystem of the host running `jira8 mcp serve` — **not** the
+> agent's client machine. When jira8 runs on the same host as the user (typical
+> Claude Desktop / Claude Code setup) this is transparent. When jira8 runs on a
+> shared or remote host, it widens the blast radius: an agent that can call
+> these tools can upload any file the jira8 process can read. Treat the MCP
+> server's file access as part of the trust boundary.
 
 ### Available MCP resources
 
