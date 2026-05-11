@@ -39,6 +39,7 @@ type IssueFields struct {
 	Labels      []string        `json:"labels,omitempty"`
 	Components  []Component     `json:"components,omitempty"`
 	Comment     *Comments       `json:"comment,omitempty"`
+	Attachment  []Attachment    `json:"attachment,omitempty"`
 	Raw         json.RawMessage `json:"-"`
 }
 
@@ -327,6 +328,20 @@ type WorklogsResponse struct {
 	MaxResults int       `json:"maxResults"`
 	Total      int       `json:"total"`
 	Worklogs   []Worklog `json:"worklogs"`
+}
+
+// Attachment represents a Jira issue attachment (returned in IssueFields.Attachment
+// and by POST /rest/api/2/issue/{key}/attachments).
+type Attachment struct {
+	ID        string `json:"id"`
+	Self      string `json:"self,omitempty"`
+	Filename  string `json:"filename"`
+	Author    *User  `json:"author,omitempty"`
+	Created   string `json:"created,omitempty"`
+	Size      int64  `json:"size,omitempty"`
+	MimeType  string `json:"mimeType,omitempty"`
+	Content   string `json:"content,omitempty"`
+	Thumbnail string `json:"thumbnail,omitempty"`
 }
 
 // JiraError represents a Jira API error response.

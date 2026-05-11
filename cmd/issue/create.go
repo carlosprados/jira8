@@ -31,6 +31,7 @@ func init() {
 	createCmd.Flags().String("epic-name", "", "Epic Name (required when --type Epic)")
 	createCmd.Flags().String("epic-link", "", "Epic key to associate this issue with (e.g. ESA-42)")
 	createCmd.Flags().Bool("markdown", false, "Treat --description as Markdown and convert to Jira Wiki Markup before sending")
+	createCmd.Flags().StringArray("attach", nil, "Attach a file (repeatable, e.g. --attach a.png --attach b.log)")
 
 	_ = createCmd.MarkFlagRequired("summary")
 }
@@ -113,8 +114,25 @@ func runCreate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// Attachments are uploaded after creation because Jira's /issue endpoint
+	// does not accept multipart bodies. The two calls are not transactional:
+	// if the upload fails the issue already exists, so we report both the
+	// created key and the upload error.
+	attachFiles, _ := cmd.Flags().GetStringArray("attach")
+	var uploaded []models.Attachment
+	if len(attachFiles) > 0 {
+		uploaded, err = a.Client.AddAttachments(context.Background(), resp.Key, attachFiles)
+		if err != nil {
+			return fmt.Errorf("created %s but failed to upload attachments: %w", resp.Key, err)
+		}
+	}
+
 	if a.Output == "json" {
-		data, err := json.MarshalIndent(resp, "", "  ")
+		payload := struct {
+			*models.CreateIssueResponse
+			Attachments []models.Attachment `json:"attachments,omitempty"`
+		}{CreateIssueResponse: resp, Attachments: uploaded}
+		data, err := json.MarshalIndent(payload, "", "  ")
 		if err != nil {
 			return err
 		}
@@ -123,5 +141,11 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("Created %s\n", resp.Key)
+	if len(uploaded) > 0 {
+		fmt.Printf("Uploaded %d attachment(s):\n", len(uploaded))
+		for _, att := range uploaded {
+			fmt.Printf("  %s  %s  (%s)\n", labelStyle.Render("#"+att.ID), att.Filename, humanSize(att.Size))
+		}
+	}
 	return nil
 }

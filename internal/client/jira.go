@@ -55,6 +55,10 @@ type Client struct {
 	baseURL    string
 	authHeader string
 	httpClient *http.Client
+	// uploadClient is used for multipart attachment uploads. It has no
+	// total-request timeout so large files on slow links are not aborted
+	// after the global 15s; callers must supply a context to bound the call.
+	uploadClient *http.Client
 }
 
 // New creates a new Jira API client from config.
@@ -70,6 +74,7 @@ func New(cfg *config.Config) *Client {
 		httpClient: &http.Client{
 			Timeout: 15 * time.Second,
 		},
+		uploadClient: &http.Client{},
 	}
 }
 
@@ -331,6 +336,47 @@ func (c *Client) GetComments(ctx context.Context, key string) ([]models.Comment,
 		return nil, fmt.Errorf("parsing comments: %w", err)
 	}
 	return resp.Comments, nil
+}
+
+// AddAttachments uploads one or more files to an issue.
+// Files are streamed via multipart/form-data; the call requires
+// X-Atlassian-Token: no-check (Jira XSRF protection).
+// Paths are resolved on the host running this process — when invoked through
+// the MCP server, that means the server host, not the AI agent's client.
+func (c *Client) AddAttachments(ctx context.Context, key string, files []string) ([]models.Attachment, error) {
+	if len(files) == 0 {
+		return nil, fmt.Errorf("no files to upload")
+	}
+	path := "/issue/" + url.PathEscape(key) + "/attachments"
+	data, err := c.doMultipartUpload(ctx, path, files)
+	if err != nil {
+		return nil, err
+	}
+
+	var attachments []models.Attachment
+	if err := json.Unmarshal(data, &attachments); err != nil {
+		return nil, fmt.Errorf("parsing attachment response: %w", err)
+	}
+	return attachments, nil
+}
+
+// ListAttachments returns all attachments on an issue. Jira already includes
+// the attachment list in the standard issue payload, so this is a thin wrapper
+// over GetIssue that surfaces fields.attachment as the primary return value.
+func (c *Client) ListAttachments(ctx context.Context, key string) ([]models.Attachment, error) {
+	issue, err := c.GetIssue(ctx, key)
+	if err != nil {
+		return nil, err
+	}
+	return issue.Fields.Attachment, nil
+}
+
+// DeleteAttachment removes an attachment by its ID. The ID is the numeric
+// attachment identifier returned by AddAttachments / ListAttachments — not
+// the issue key. The endpoint lives outside /issue (DELETE /attachment/{id}).
+func (c *Client) DeleteAttachment(ctx context.Context, attachmentID string) error {
+	_, err := c.do(ctx, http.MethodDelete, "/attachment/"+url.PathEscape(attachmentID), nil)
+	return err
 }
 
 // GetMyself returns the currently authenticated user.

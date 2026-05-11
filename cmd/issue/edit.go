@@ -28,6 +28,7 @@ func init() {
 	editCmd.Flags().String("epic-name", "", "New Epic Name (only valid on Epic issues)")
 	editCmd.Flags().String("epic-link", "", "Epic key to associate this issue with (empty to detach)")
 	editCmd.Flags().Bool("markdown", false, "Treat --description as Markdown and convert to Jira Wiki Markup before sending")
+	editCmd.Flags().StringArray("attach", nil, "Attach a file to the issue (repeatable). Can be used alone, without other field edits.")
 }
 
 func runEdit(cmd *cobra.Command, args []string) error {
@@ -91,15 +92,30 @@ func runEdit(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	if len(fields) == 0 {
-		return fmt.Errorf("no fields to update; use --summary, --description, --assignee, --priority, --epic-name, or --epic-link")
+	attachFiles, _ := cmd.Flags().GetStringArray("attach")
+
+	if len(fields) == 0 && len(attachFiles) == 0 {
+		return fmt.Errorf("no fields to update; use --summary, --description, --assignee, --priority, --epic-name, --epic-link, or --attach")
 	}
 
-	req := &models.EditIssueRequest{Fields: fields}
-	if err := a.Client.EditIssue(context.Background(), key, req); err != nil {
-		return err
+	if len(fields) > 0 {
+		req := &models.EditIssueRequest{Fields: fields}
+		if err := a.Client.EditIssue(context.Background(), key, req); err != nil {
+			return err
+		}
+		fmt.Printf("Updated %s\n", key)
 	}
 
-	fmt.Printf("Updated %s\n", key)
+	if len(attachFiles) > 0 {
+		uploaded, err := a.Client.AddAttachments(context.Background(), key, attachFiles)
+		if err != nil {
+			return fmt.Errorf("attaching files to %s: %w", key, err)
+		}
+		fmt.Printf("Uploaded %d attachment(s) to %s:\n", len(uploaded), key)
+		for _, att := range uploaded {
+			fmt.Printf("  %s  %s  (%s)\n", labelStyle.Render("#"+att.ID), att.Filename, humanSize(att.Size))
+		}
+	}
+
 	return nil
 }
