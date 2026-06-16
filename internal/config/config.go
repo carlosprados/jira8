@@ -10,7 +10,6 @@ import (
 // Config holds the Jira CLI configuration.
 type Config struct {
 	URL      string `mapstructure:"url"`
-	Email    string `mapstructure:"email"`
 	Token    string `mapstructure:"token"`
 	User     string `mapstructure:"user"`
 	Password string `mapstructure:"password"`
@@ -35,7 +34,6 @@ func Load(configFile string) (*Config, error) {
 	viper.SetDefault("project", "ESA")
 
 	_ = viper.BindEnv("url", "JIRA_URL")
-	_ = viper.BindEnv("email", "JIRA_EMAIL")
 	_ = viper.BindEnv("token", "JIRA_TOKEN")
 	_ = viper.BindEnv("user", "JIRA_USER")
 	_ = viper.BindEnv("password", "JIRA_PASSWORD")
