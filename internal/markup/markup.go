@@ -290,7 +290,7 @@ func WikiToMarkdown(s string) string {
 	inQuote := false
 	inTable := false
 
-	for i := 0; i < len(lines); i++ {
+	for i := range lines {
 		line := lines[i]
 
 		if inFence {

@@ -209,7 +209,7 @@ func printIssueDetailWithEpic(issue *models.Issue, epicNameID, epicLinkID string
 		}
 		for _, c := range comments[start:] {
 			fmt.Printf("\n  %s  %s\n", headerStyle.Render(userName(c.Author)), labelStyle.Render(c.Created))
-			for _, line := range strings.Split(c.Body, "\n") {
+			for line := range strings.SplitSeq(c.Body, "\n") {
 				fmt.Printf("  %s\n", line)
 			}
 		}
