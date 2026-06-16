@@ -3,3 +3,8 @@ jira8
 .jira.yaml
 .env
 .claude/
+
+# Local developer environment (not part of the project)
+.task/
+.tmuxp.yaml
+jira8-improvements.md
