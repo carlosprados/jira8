@@ -2,7 +2,6 @@ package issue
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -76,13 +75,9 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	if assignee != "" {
-		username := assignee
-		if strings.EqualFold(assignee, "me") {
-			user, err := a.Client.GetMyself(context.Background())
-			if err != nil {
-				return fmt.Errorf("resolving current user: %w", err)
-			}
-			username = user.Name
+		username, err := a.Client.ResolveAssignee(context.Background(), assignee)
+		if err != nil {
+			return err
 		}
 		req.Fields.Assignee = &models.UserRef{Name: username}
 	}
@@ -132,12 +127,7 @@ func runCreate(cmd *cobra.Command, args []string) error {
 			*models.CreateIssueResponse
 			Attachments []models.Attachment `json:"attachments,omitempty"`
 		}{CreateIssueResponse: resp, Attachments: uploaded}
-		data, err := json.MarshalIndent(payload, "", "  ")
-		if err != nil {
-			return err
-		}
-		fmt.Println(string(data))
-		return nil
+		return app.OutputJSON(payload)
 	}
 
 	fmt.Printf("Created %s\n", resp.Key)

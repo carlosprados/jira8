@@ -158,7 +158,7 @@ func epicBreakdownPromptHandler(jc *client.Client) server.PromptHandlerFunc {
 
 		var b strings.Builder
 		b.WriteString(summariseIssueForPrompt(epic))
-		b.WriteString(fmt.Sprintf("\n\nCurrent children (%d):\n", len(children)))
+		fmt.Fprintf(&b, "\n\nCurrent children (%d):\n", len(children))
 		if len(children) == 0 {
 			b.WriteString("  (none)\n")
 		}
@@ -171,7 +171,7 @@ func epicBreakdownPromptHandler(jc *client.Client) server.PromptHandlerFunc {
 			if c.Fields.IssueType != nil {
 				itype = c.Fields.IssueType.Name
 			}
-			b.WriteString(fmt.Sprintf("  - %s [%s, %s] %s\n", c.Key, itype, status, c.Fields.Summary))
+			fmt.Fprintf(&b, "  - %s [%s, %s] %s\n", c.Key, itype, status, c.Fields.Summary)
 		}
 
 		instructions := strings.Join([]string{
@@ -208,7 +208,7 @@ func summariseCommentsPromptHandler(jc *client.Client) server.PromptHandlerFunc 
 
 		var b strings.Builder
 		b.WriteString(summariseIssueForPrompt(issue))
-		b.WriteString(fmt.Sprintf("\nComments (%d):\n", len(comments)))
+		fmt.Fprintf(&b, "\nComments (%d):\n", len(comments))
 		if len(comments) == 0 {
 			b.WriteString("  (none)\n")
 		}
@@ -221,7 +221,7 @@ func summariseCommentsPromptHandler(jc *client.Client) server.PromptHandlerFunc 
 				}
 			}
 			body := strings.ReplaceAll(c.Body, "\n", " ")
-			b.WriteString(fmt.Sprintf("  - [%s] %s — %s\n", c.Created, author, body))
+			fmt.Fprintf(&b, "  - [%s] %s — %s\n", c.Created, author, body)
 		}
 
 		instructions := strings.Join([]string{
@@ -246,32 +246,32 @@ func summariseCommentsPromptHandler(jc *client.Client) server.PromptHandlerFunc 
 func summariseIssueForPrompt(i *models.Issue) string {
 	f := i.Fields
 	var b strings.Builder
-	b.WriteString(fmt.Sprintf("Issue %s — %s\n", i.Key, f.Summary))
+	fmt.Fprintf(&b, "Issue %s — %s\n", i.Key, f.Summary)
 	if f.IssueType != nil {
-		b.WriteString(fmt.Sprintf("  Type:     %s\n", f.IssueType.Name))
+		fmt.Fprintf(&b, "  Type:     %s\n", f.IssueType.Name)
 	}
 	if f.Status != nil {
-		b.WriteString(fmt.Sprintf("  Status:   %s\n", f.Status.Name))
+		fmt.Fprintf(&b, "  Status:   %s\n", f.Status.Name)
 	}
 	if f.Priority != nil {
-		b.WriteString(fmt.Sprintf("  Priority: %s\n", f.Priority.Name))
+		fmt.Fprintf(&b, "  Priority: %s\n", f.Priority.Name)
 	}
 	if f.Assignee != nil {
 		name := f.Assignee.DisplayName
 		if name == "" {
 			name = f.Assignee.Name
 		}
-		b.WriteString(fmt.Sprintf("  Assignee: %s\n", name))
+		fmt.Fprintf(&b, "  Assignee: %s\n", name)
 	}
 	if f.Reporter != nil {
 		name := f.Reporter.DisplayName
 		if name == "" {
 			name = f.Reporter.Name
 		}
-		b.WriteString(fmt.Sprintf("  Reporter: %s\n", name))
+		fmt.Fprintf(&b, "  Reporter: %s\n", name)
 	}
 	if len(f.Labels) > 0 {
-		b.WriteString(fmt.Sprintf("  Labels:   %s\n", strings.Join(f.Labels, ", ")))
+		fmt.Fprintf(&b, "  Labels:   %s\n", strings.Join(f.Labels, ", "))
 	}
 	if f.Description != "" {
 		b.WriteString("Description:\n")

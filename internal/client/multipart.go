@@ -2,15 +2,12 @@ package client
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
-
-	"github.com/amplia/jira8/internal/models"
 )
 
 // doMultipartUpload posts one or more files to a Jira multipart endpoint
@@ -88,7 +85,7 @@ func (c *Client) doMultipartUpload(ctx context.Context, path string, files []str
 	if err != nil {
 		return nil, fmt.Errorf("executing request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -96,13 +93,7 @@ func (c *Client) doMultipartUpload(ctx context.Context, path string, files []str
 	}
 
 	if resp.StatusCode >= 400 {
-		apiErr := &APIError{StatusCode: resp.StatusCode}
-		var jiraErr models.JiraError
-		if json.Unmarshal(respBody, &jiraErr) == nil {
-			apiErr.Messages = jiraErr.ErrorMessages
-			apiErr.Errors = jiraErr.Errors
-		}
-		return nil, apiErr
+		return nil, parseAPIError(resp.StatusCode, respBody)
 	}
 
 	return respBody, nil

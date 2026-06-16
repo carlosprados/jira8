@@ -322,8 +322,8 @@ type CreateIssueResponse struct {
 	Self string `json:"self"`
 }
 
-// ProjectStatuses represents the response from GET /rest/api/2/project/{key}/statuses.
-// Returns issue types with their available statuses.
+// IssueTypeWithStatuses is a single issue type with its available statuses,
+// one element of the response from GET /rest/api/2/project/{key}/statuses.
 type IssueTypeWithStatuses struct {
 	Name     string   `json:"name"`
 	ID       string   `json:"id"`

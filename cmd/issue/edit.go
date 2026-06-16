@@ -3,7 +3,6 @@ package issue
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/amplia/jira8/cmd/app"
 	"github.com/amplia/jira8/internal/markup"
@@ -56,13 +55,9 @@ func runEdit(cmd *cobra.Command, args []string) error {
 		if v == "" {
 			fields["assignee"] = nil
 		} else {
-			username := v
-			if strings.EqualFold(v, "me") {
-				user, err := a.Client.GetMyself(context.Background())
-				if err != nil {
-					return fmt.Errorf("resolving current user: %w", err)
-				}
-				username = user.Name
+			username, err := a.Client.ResolveAssignee(context.Background(), v)
+			if err != nil {
+				return err
 			}
 			fields["assignee"] = models.UserRef{Name: username}
 		}

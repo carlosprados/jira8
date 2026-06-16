@@ -38,9 +38,7 @@ type APIError struct {
 
 func (e *APIError) Error() string {
 	var parts []string
-	for _, m := range e.Messages {
-		parts = append(parts, m)
-	}
+	parts = append(parts, e.Messages...)
 	for field, msg := range e.Errors {
 		parts = append(parts, fmt.Sprintf("%s: %s", field, msg))
 	}
@@ -48,6 +46,19 @@ func (e *APIError) Error() string {
 		return fmt.Sprintf("Jira API error (HTTP %d)", e.StatusCode)
 	}
 	return fmt.Sprintf("Jira API error (HTTP %d): %s", e.StatusCode, strings.Join(parts, "; "))
+}
+
+// parseAPIError builds an APIError from a Jira error response body. A body that
+// is not the expected JiraError shape leaves Messages/Errors empty, so the
+// error still carries the HTTP status code.
+func parseAPIError(statusCode int, respBody []byte) *APIError {
+	apiErr := &APIError{StatusCode: statusCode}
+	var jiraErr models.JiraError
+	if json.Unmarshal(respBody, &jiraErr) == nil {
+		apiErr.Messages = jiraErr.ErrorMessages
+		apiErr.Errors = jiraErr.Errors
+	}
+	return apiErr
 }
 
 // Client is the Jira REST API client.
@@ -80,18 +91,24 @@ func New(cfg *config.Config) *Client {
 
 // do executes an HTTP request against the Jira API with auth, retries, and error handling.
 func (c *Client) do(ctx context.Context, method, path string, body any) ([]byte, error) {
-	var bodyReader io.Reader
+	var bodyBytes []byte
 	if body != nil {
 		data, err := json.Marshal(body)
 		if err != nil {
 			return nil, fmt.Errorf("marshaling request body: %w", err)
 		}
-		bodyReader = bytes.NewReader(data)
+		bodyBytes = data
 	}
 
 	fullURL := c.baseURL + apiBasePath + path
 
 	for attempt := range maxRetries {
+		// Recreate the reader on every attempt; a retried request needs a fresh
+		// reader because the previous attempt consumed the previous one.
+		var bodyReader io.Reader
+		if bodyBytes != nil {
+			bodyReader = bytes.NewReader(bodyBytes)
+		}
 		req, err := http.NewRequestWithContext(ctx, method, fullURL, bodyReader)
 		if err != nil {
 			return nil, fmt.Errorf("creating request: %w", err)
@@ -106,7 +123,7 @@ func (c *Client) do(ctx context.Context, method, path string, body any) ([]byte,
 		}
 
 		respBody, err := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		if err != nil {
 			return nil, fmt.Errorf("reading response body: %w", err)
 		}
@@ -119,22 +136,11 @@ func (c *Client) do(ctx context.Context, method, path string, body any) ([]byte,
 				}
 			}
 			time.Sleep(wait)
-			// Reset body reader for retry
-			if body != nil {
-				data, _ := json.Marshal(body)
-				bodyReader = bytes.NewReader(data)
-			}
 			continue
 		}
 
 		if resp.StatusCode >= 400 {
-			apiErr := &APIError{StatusCode: resp.StatusCode}
-			var jiraErr models.JiraError
-			if json.Unmarshal(respBody, &jiraErr) == nil {
-				apiErr.Messages = jiraErr.ErrorMessages
-				apiErr.Errors = jiraErr.Errors
-			}
-			return nil, apiErr
+			return nil, parseAPIError(resp.StatusCode, respBody)
 		}
 
 		return respBody, nil
@@ -412,6 +418,21 @@ func (c *Client) GetMyself(ctx context.Context) (*models.User, error) {
 	return &user, nil
 }
 
+// ResolveAssignee maps the "me" alias (case-insensitive) to the authenticated
+// user's username via GetMyself; any other value is returned unchanged. Callers
+// are responsible for the empty-string case (skip the field, or clear it).
+// Shared by the CLI create/edit commands and the equivalent MCP tools.
+func (c *Client) ResolveAssignee(ctx context.Context, assignee string) (string, error) {
+	if !strings.EqualFold(assignee, "me") {
+		return assignee, nil
+	}
+	user, err := c.GetMyself(ctx)
+	if err != nil {
+		return "", fmt.Errorf("resolving current user: %w", err)
+	}
+	return user.Name, nil
+}
+
 // GetProjectStatuses returns issue types and their statuses for a project.
 func (c *Client) GetProjectStatuses(ctx context.Context, projectKey string) ([]models.IssueTypeWithStatuses, error) {
 	data, err := c.do(ctx, http.MethodGet, "/project/"+url.PathEscape(projectKey)+"/statuses", nil)
@@ -458,7 +479,7 @@ func (c *Client) GetPriorities(ctx context.Context) ([]models.Priority, error) {
 	return result, nil
 }
 
-// JQLFilters groups the individual filter inputs accepted by BuildJQL.
+// JQLFilters groups the individual filter inputs accepted by BuildJQLWith.
 // Fields are optional — empty values are skipped.
 type JQLFilters struct {
 	Project  string
@@ -466,13 +487,6 @@ type JQLFilters struct {
 	Assignee string
 	Epic     string // issue key whose Epic Link equals this value
 	Type     string // issue type name (e.g. "Epic", "Story")
-}
-
-// BuildJQL constructs a JQL query from the provided filters.
-// Use BuildJQLWith for the full filter set; this variant is kept for compatibility
-// and covers project/status/assignee only.
-func BuildJQL(project, status, assignee string) string {
-	return BuildJQLWith(JQLFilters{Project: project, Status: status, Assignee: assignee})
 }
 
 // BuildJQLWith constructs a JQL query from a JQLFilters struct.

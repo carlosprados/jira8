@@ -2,7 +2,6 @@ package epic
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -59,12 +58,7 @@ func runView(cmd *cobra.Command, args []string) error {
 			Epic     *models.Issue  `json:"epic"`
 			Children []models.Issue `json:"children,omitempty"`
 		}{Epic: issue, Children: children}
-		data, err := json.MarshalIndent(out, "", "  ")
-		if err != nil {
-			return err
-		}
-		fmt.Println(string(data))
-		return nil
+		return app.OutputJSON(out)
 	}
 
 	printEpicDetail(issue, epicNameID, epicLinkID)

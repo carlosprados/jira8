@@ -469,13 +469,9 @@ func createIssueHandler(jc *client.Client) server.ToolHandlerFunc {
 		}
 
 		if assignee := req.GetString("assignee", ""); assignee != "" {
-			username := assignee
-			if strings.EqualFold(assignee, "me") {
-				user, err := jc.GetMyself(ctx)
-				if err != nil {
-					return mcp.NewToolResultError(fmt.Sprintf("resolving current user: %s", err)), nil
-				}
-				username = user.Name
+			username, err := jc.ResolveAssignee(ctx, assignee)
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
 			}
 			createReq.Fields.Assignee = &models.UserRef{Name: username}
 		}
@@ -549,13 +545,9 @@ func editIssueHandler(jc *client.Client) server.ToolHandlerFunc {
 			if assignee == "" {
 				fields["assignee"] = nil
 			} else {
-				username := assignee
-				if strings.EqualFold(assignee, "me") {
-					user, err := jc.GetMyself(ctx)
-					if err != nil {
-						return mcp.NewToolResultError(fmt.Sprintf("resolving current user: %s", err)), nil
-					}
-					username = user.Name
+				username, err := jc.ResolveAssignee(ctx, assignee)
+				if err != nil {
+					return mcp.NewToolResultError(err.Error()), nil
 				}
 				fields["assignee"] = models.UserRef{Name: username}
 			}
@@ -726,20 +718,10 @@ func transitionIssueHandler(jc *client.Client) server.ToolHandlerFunc {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
-		var match *models.Transition
-		for i, t := range transitions {
-			if strings.EqualFold(t.Name, transitionName) {
-				match = &transitions[i]
-				break
-			}
-		}
-
+		nameOf := func(t models.Transition) string { return t.Name }
+		match := app.MatchByName(transitions, transitionName, nameOf)
 		if match == nil {
-			names := make([]string, len(transitions))
-			for i, t := range transitions {
-				names[i] = t.Name
-			}
-			return mcp.NewToolResultError(fmt.Sprintf("transition %q not found; available: %s", transitionName, strings.Join(names, ", "))), nil
+			return mcp.NewToolResultError(fmt.Sprintf("transition %q not found; available: %s", transitionName, strings.Join(app.Names(transitions, nameOf), ", "))), nil
 		}
 
 		transReq := &models.TransitionRequest{
@@ -774,19 +756,10 @@ func linkIssuesHandler(jc *client.Client) server.ToolHandlerFunc {
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
-		var match *models.IssueLinkType
-		for i := range types {
-			if strings.EqualFold(types[i].Name, typeName) {
-				match = &types[i]
-				break
-			}
-		}
+		nameOf := func(t models.IssueLinkType) string { return t.Name }
+		match := app.MatchByName(types, typeName, nameOf)
 		if match == nil {
-			names := make([]string, len(types))
-			for i, t := range types {
-				names[i] = t.Name
-			}
-			return mcp.NewToolResultError(fmt.Sprintf("link type %q not found; available: %s", typeName, strings.Join(names, ", "))), nil
+			return mcp.NewToolResultError(fmt.Sprintf("link type %q not found; available: %s", typeName, strings.Join(app.Names(types, nameOf), ", "))), nil
 		}
 
 		linkReq := &models.IssueLinkRequest{
@@ -1056,13 +1029,9 @@ func createEpicHandler(jc *client.Client) server.ToolHandlerFunc {
 		}
 
 		if assignee := req.GetString("assignee", ""); assignee != "" {
-			username := assignee
-			if strings.EqualFold(assignee, "me") {
-				user, err := jc.GetMyself(ctx)
-				if err != nil {
-					return mcp.NewToolResultError(fmt.Sprintf("resolving current user: %s", err)), nil
-				}
-				username = user.Name
+			username, err := jc.ResolveAssignee(ctx, assignee)
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
 			}
 			createReq.Fields.Assignee = &models.UserRef{Name: username}
 		}
@@ -1111,13 +1080,9 @@ func editEpicHandler(jc *client.Client) server.ToolHandlerFunc {
 			if assignee == "" {
 				fields["assignee"] = nil
 			} else {
-				username := assignee
-				if strings.EqualFold(assignee, "me") {
-					user, err := jc.GetMyself(ctx)
-					if err != nil {
-						return mcp.NewToolResultError(fmt.Sprintf("resolving current user: %s", err)), nil
-					}
-					username = user.Name
+				username, err := jc.ResolveAssignee(ctx, assignee)
+				if err != nil {
+					return mcp.NewToolResultError(err.Error()), nil
 				}
 				fields["assignee"] = models.UserRef{Name: username}
 			}

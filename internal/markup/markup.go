@@ -132,10 +132,10 @@ func indentDepth(indent string) int {
 }
 
 var (
-	fenceLineRe   = regexp.MustCompile("^```([A-Za-z0-9_+\\-]*)\\s*$")
-	headingRe     = regexp.MustCompile(`^(#{1,6})\s+(.*)$`)
-	bulletListRe  = regexp.MustCompile(`^([ \t]*)[-*+]\s+(.*)$`)
-	orderedListRe = regexp.MustCompile(`^([ \t]*)\d+\.\s+(.*)$`)
+	fenceLineRe          = regexp.MustCompile("^```([A-Za-z0-9_+\\-]*)\\s*$")
+	headingRe            = regexp.MustCompile(`^(#{1,6})\s+(.*)$`)
+	bulletListRe         = regexp.MustCompile(`^([ \t]*)[-*+]\s+(.*)$`)
+	orderedListRe        = regexp.MustCompile(`^([ \t]*)\d+\.\s+(.*)$`)
 	tableSeparatorCellRe = regexp.MustCompile(`^:?-{3,}:?$`)
 
 	inlineCodeRe  = regexp.MustCompile("`([^`\n]+)`")
@@ -185,12 +185,12 @@ func transformInline(s string) string {
 
 	s = boldPlaceholderRe.ReplaceAllStringFunc(s, func(m string) string {
 		var idx int
-		fmt.Sscanf(m, "\x00B%d\x00", &idx)
+		_, _ = fmt.Sscanf(m, "\x00B%d\x00", &idx)
 		return "*" + bolds[idx] + "*"
 	})
 	s = codePlaceholderRe.ReplaceAllStringFunc(s, func(m string) string {
 		var idx int
-		fmt.Sscanf(m, "\x00C%d\x00", &idx)
+		_, _ = fmt.Sscanf(m, "\x00C%d\x00", &idx)
 		return "{{" + codes[idx] + "}}"
 	})
 
@@ -252,15 +252,22 @@ func isTableSeparator(s string) bool {
 	return true
 }
 
-func splitTableRow(s string) []string {
+// splitTableCells splits a table row on the given delimiter, dropping the
+// leading/trailing delimiter and trimming each cell. It backs both the
+// Markdown ("|") and Wiki header ("||") splitters.
+func splitTableCells(s, delim string) []string {
 	t := strings.TrimSpace(s)
-	t = strings.TrimPrefix(t, "|")
-	t = strings.TrimSuffix(t, "|")
-	parts := strings.Split(t, "|")
+	t = strings.TrimPrefix(t, delim)
+	t = strings.TrimSuffix(t, delim)
+	parts := strings.Split(t, delim)
 	for i, p := range parts {
 		parts[i] = strings.TrimSpace(p)
 	}
 	return parts
+}
+
+func splitTableRow(s string) []string {
+	return splitTableCells(s, "|")
 }
 
 // WikiToMarkdown converts a Jira Server 8 Wiki Markup string into Markdown.
@@ -283,7 +290,7 @@ func WikiToMarkdown(s string) string {
 	inQuote := false
 	inTable := false
 
-	for i := 0; i < len(lines); i++ {
+	for i := range lines {
 		line := lines[i]
 
 		if inFence {
@@ -432,12 +439,12 @@ func transformInlineWiki(s string) string {
 
 	s = wikiBoldPlaceholderRe.ReplaceAllStringFunc(s, func(m string) string {
 		var idx int
-		fmt.Sscanf(m, "\x00X%d\x00", &idx)
+		_, _ = fmt.Sscanf(m, "\x00X%d\x00", &idx)
 		return "**" + bolds[idx] + "**"
 	})
 	s = wikiCodePlaceholderRe.ReplaceAllStringFunc(s, func(m string) string {
 		var idx int
-		fmt.Sscanf(m, "\x00W%d\x00", &idx)
+		_, _ = fmt.Sscanf(m, "\x00W%d\x00", &idx)
 		return "`" + codes[idx] + "`"
 	})
 
@@ -461,12 +468,5 @@ func isWikiTableRow(s string) bool {
 }
 
 func splitWikiTableHeader(s string) []string {
-	t := strings.TrimSpace(s)
-	t = strings.TrimPrefix(t, "||")
-	t = strings.TrimSuffix(t, "||")
-	parts := strings.Split(t, "||")
-	for i, p := range parts {
-		parts[i] = strings.TrimSpace(p)
-	}
-	return parts
+	return splitTableCells(s, "||")
 }

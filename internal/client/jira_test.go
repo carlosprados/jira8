@@ -59,16 +59,6 @@ func TestBuildJQLWith(t *testing.T) {
 	}
 }
 
-// TestBuildJQL_Compat verifies the legacy 3-arg wrapper still builds the same JQL
-// as the full filter struct for equivalent inputs.
-func TestBuildJQL_Compat(t *testing.T) {
-	got := BuildJQL("ESA", "Done", "alice")
-	want := BuildJQLWith(JQLFilters{Project: "ESA", Status: "Done", Assignee: "alice"})
-	if got != want {
-		t.Errorf("BuildJQL vs BuildJQLWith mismatch: %q vs %q", got, want)
-	}
-}
-
 func TestResolveEpicFields(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !strings.HasSuffix(r.URL.Path, "/rest/api/2/field") {

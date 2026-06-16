@@ -2,7 +2,6 @@ package issue
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -49,9 +48,9 @@ func runLink(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	match := matchLinkType(types, typeName)
+	match := app.MatchByName(types, typeName, linkTypeName)
 	if match == nil {
-		return fmt.Errorf("link type %q not found; available: %s", typeName, strings.Join(linkTypeNames(types), ", "))
+		return fmt.Errorf("link type %q not found; available: %s", typeName, strings.Join(app.Names(types, linkTypeName), ", "))
 	}
 
 	req := &models.IssueLinkRequest{
@@ -78,12 +77,7 @@ func runLinkTypes(cmd *cobra.Command, args []string) error {
 	}
 
 	if a.Output == "json" {
-		data, err := json.MarshalIndent(types, "", "  ")
-		if err != nil {
-			return err
-		}
-		fmt.Println(string(data))
-		return nil
+		return app.OutputJSON(types)
 	}
 
 	if len(types) == 0 {
@@ -101,20 +95,5 @@ func runLinkTypes(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// matchLinkType returns the link type whose name matches (case-insensitive), or nil.
-func matchLinkType(types []models.IssueLinkType, name string) *models.IssueLinkType {
-	for i := range types {
-		if strings.EqualFold(types[i].Name, name) {
-			return &types[i]
-		}
-	}
-	return nil
-}
-
-func linkTypeNames(types []models.IssueLinkType) []string {
-	names := make([]string, len(types))
-	for i, t := range types {
-		names[i] = t.Name
-	}
-	return names
-}
+// linkTypeName extracts the name of a link type for app.MatchByName / app.Names.
+func linkTypeName(t models.IssueLinkType) string { return t.Name }
