@@ -2,7 +2,6 @@ package project
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/amplia/jira8/cmd/app"
@@ -25,12 +24,7 @@ func runPriorities(cmd *cobra.Command, args []string) error {
 	}
 
 	if a.Output == "json" {
-		data, err := json.MarshalIndent(priorities, "", "  ")
-		if err != nil {
-			return err
-		}
-		fmt.Println(string(data))
-		return nil
+		return app.OutputJSON(priorities)
 	}
 
 	fmt.Println("Priorities:")

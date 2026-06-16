@@ -2,7 +2,6 @@ package issue
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/amplia/jira8/cmd/app"
@@ -36,12 +35,7 @@ func runWorklogList(cmd *cobra.Command, args []string) error {
 	}
 
 	if a.Output == "json" {
-		data, err := json.MarshalIndent(worklogs, "", "  ")
-		if err != nil {
-			return err
-		}
-		fmt.Println(string(data))
-		return nil
+		return app.OutputJSON(worklogs)
 	}
 
 	if len(worklogs) == 0 {

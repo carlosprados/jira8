@@ -2,7 +2,6 @@ package issue
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -42,20 +41,10 @@ func runTransition(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	var match *models.Transition
-	for i, t := range transitions {
-		if strings.EqualFold(t.Name, to) {
-			match = &transitions[i]
-			break
-		}
-	}
-
+	transitionName := func(t models.Transition) string { return t.Name }
+	match := app.MatchByName(transitions, to, transitionName)
 	if match == nil {
-		names := make([]string, len(transitions))
-		for i, t := range transitions {
-			names[i] = t.Name
-		}
-		return fmt.Errorf("transition %q not found; available: %s", to, strings.Join(names, ", "))
+		return fmt.Errorf("transition %q not found; available: %s", to, strings.Join(app.Names(transitions, transitionName), ", "))
 	}
 
 	req := &models.TransitionRequest{
@@ -83,12 +72,7 @@ func runTransitions(cmd *cobra.Command, args []string) error {
 	}
 
 	if a.Output == "json" {
-		data, err := json.MarshalIndent(transitions, "", "  ")
-		if err != nil {
-			return err
-		}
-		fmt.Println(string(data))
-		return nil
+		return app.OutputJSON(transitions)
 	}
 
 	printTransitions(transitions)

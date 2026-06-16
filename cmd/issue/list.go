@@ -2,8 +2,6 @@ package issue
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 
 	"github.com/amplia/jira8/cmd/app"
 	"github.com/amplia/jira8/internal/client"
@@ -59,12 +57,7 @@ func runList(cmd *cobra.Command, args []string) error {
 	}
 
 	if app.Get().Output == "json" {
-		data, err := json.MarshalIndent(issues, "", "  ")
-		if err != nil {
-			return err
-		}
-		fmt.Println(string(data))
-		return nil
+		return app.OutputJSON(issues)
 	}
 
 	printIssueTable(issues)

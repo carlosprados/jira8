@@ -2,7 +2,6 @@ package issue
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -37,12 +36,7 @@ func runCommentList(cmd *cobra.Command, args []string) error {
 	}
 
 	if a.Output == "json" {
-		data, err := json.MarshalIndent(comments, "", "  ")
-		if err != nil {
-			return err
-		}
-		fmt.Println(string(data))
-		return nil
+		return app.OutputJSON(comments)
 	}
 
 	if len(comments) == 0 {

@@ -2,7 +2,6 @@ package issue
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/amplia/jira8/cmd/app"
@@ -49,12 +48,7 @@ func runCommentAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	if a.Output == "json" {
-		data, err := json.MarshalIndent(comment, "", "  ")
-		if err != nil {
-			return err
-		}
-		fmt.Println(string(data))
-		return nil
+		return app.OutputJSON(comment)
 	}
 
 	fmt.Printf("Comment added to %s by %s\n", key, userName(comment.Author))

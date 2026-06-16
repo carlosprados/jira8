@@ -2,7 +2,6 @@ package issue
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/amplia/jira8/cmd/app"
@@ -62,12 +61,7 @@ func runAttachmentAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	if a.Output == "json" {
-		data, err := json.MarshalIndent(attachments, "", "  ")
-		if err != nil {
-			return err
-		}
-		fmt.Println(string(data))
-		return nil
+		return app.OutputJSON(attachments)
 	}
 
 	fmt.Printf("Uploaded %d attachment(s) to %s:\n", len(attachments), key)
@@ -87,12 +81,7 @@ func runAttachmentList(cmd *cobra.Command, args []string) error {
 	}
 
 	if a.Output == "json" {
-		data, err := json.MarshalIndent(attachments, "", "  ")
-		if err != nil {
-			return err
-		}
-		fmt.Println(string(data))
-		return nil
+		return app.OutputJSON(attachments)
 	}
 
 	if len(attachments) == 0 {

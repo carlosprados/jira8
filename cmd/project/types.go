@@ -2,7 +2,6 @@ package project
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/amplia/jira8/cmd/app"
@@ -34,12 +33,7 @@ func runTypes(cmd *cobra.Command, args []string) error {
 	}
 
 	if a.Output == "json" {
-		data, err := json.MarshalIndent(meta.IssueTypes, "", "  ")
-		if err != nil {
-			return err
-		}
-		fmt.Println(string(data))
-		return nil
+		return app.OutputJSON(meta.IssueTypes)
 	}
 
 	fmt.Printf("Issue types for %s:\n\n", project)

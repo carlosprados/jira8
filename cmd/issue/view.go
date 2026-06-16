@@ -2,8 +2,6 @@ package issue
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 
 	"github.com/amplia/jira8/cmd/app"
 	"github.com/spf13/cobra"
@@ -33,12 +31,7 @@ func runView(cmd *cobra.Command, args []string) error {
 	}
 
 	if a.Output == "json" {
-		data, err := json.MarshalIndent(issue, "", "  ")
-		if err != nil {
-			return err
-		}
-		fmt.Println(string(data))
-		return nil
+		return app.OutputJSON(issue)
 	}
 
 	// Resolve Epic custom field IDs best-effort so view can render Epic Name /
