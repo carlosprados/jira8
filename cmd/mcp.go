@@ -131,6 +131,24 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 	)
 
 	s.AddTool(
+		mcp.NewTool("jira_link_issues",
+			mcp.WithDescription("Link two Jira issues (e.g. Relates, Blocks, Duplicate). The type must be one of the names returned by jira_list_link_types; defaults to Relates."),
+			mcp.WithString("outward", mcp.Required(), mcp.Description("Outward issue key — subject of the relation, e.g. the one that 'blocks' (e.g. ESA-207)")),
+			mcp.WithString("inward", mcp.Required(), mcp.Description("Inward issue key — object of the relation, e.g. the one that 'is blocked by' (e.g. ESA-214)")),
+			mcp.WithString("type", mcp.Description("Link type name; defaults to 'Relates'")),
+			mcp.WithString("comment", mcp.Description("Optional comment added alongside the link")),
+		),
+		linkIssuesHandler(jc),
+	)
+
+	s.AddTool(
+		mcp.NewTool("jira_list_link_types",
+			mcp.WithDescription("List the available issue link types in the Jira instance"),
+		),
+		listLinkTypesHandler(jc),
+	)
+
+	s.AddTool(
 		mcp.NewTool("jira_add_worklog",
 			mcp.WithDescription("Add a worklog entry to a Jira issue"),
 			mcp.WithString("key", mcp.Required(), mcp.Description("Issue key (e.g. ESA-123)")),
@@ -736,6 +754,63 @@ func transitionIssueHandler(jc *client.Client) server.ToolHandlerFunc {
 			target = match.To.Name
 		}
 		return mcp.NewToolResultText(fmt.Sprintf(`{"transitioned": "%s", "to": "%s"}`, key, target)), nil
+	}
+}
+
+func linkIssuesHandler(jc *client.Client) server.ToolHandlerFunc {
+	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		outward, err := req.RequireString("outward")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		inward, err := req.RequireString("inward")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		typeName := req.GetString("type", "Relates")
+		comment := req.GetString("comment", "")
+
+		types, err := jc.GetIssueLinkTypes(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		var match *models.IssueLinkType
+		for i := range types {
+			if strings.EqualFold(types[i].Name, typeName) {
+				match = &types[i]
+				break
+			}
+		}
+		if match == nil {
+			names := make([]string, len(types))
+			for i, t := range types {
+				names[i] = t.Name
+			}
+			return mcp.NewToolResultError(fmt.Sprintf("link type %q not found; available: %s", typeName, strings.Join(names, ", "))), nil
+		}
+
+		linkReq := &models.IssueLinkRequest{
+			Type:         models.IssueLinkTypeRef{Name: match.Name},
+			OutwardIssue: models.LinkedIssueRef{Key: outward},
+			InwardIssue:  models.LinkedIssueRef{Key: inward},
+		}
+		if comment != "" {
+			linkReq.Comment = &models.IssueLinkComment{Body: comment}
+		}
+		if err := jc.LinkIssues(ctx, linkReq); err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		return mcp.NewToolResultText(fmt.Sprintf(`{"linked": true, "outward": %q, "type": %q, "inward": %q}`, outward, match.Name, inward)), nil
+	}
+}
+
+func listLinkTypesHandler(jc *client.Client) server.ToolHandlerFunc {
+	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		types, err := jc.GetIssueLinkTypes(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		return mcp.NewToolResultText(toJSON(types)), nil
 	}
 }
 

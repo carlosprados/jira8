@@ -154,6 +154,18 @@ jira8 issue transitions MYPROJ-123               # list available transitions
 jira8 issue transition MYPROJ-123 --to "Done"    # perform transition
 ```
 
+### Links
+
+```bash
+jira8 issue link-types                                   # list available link types
+jira8 issue link MYPROJ-1 MYPROJ-2 --type "Relates"      # relate two issues
+jira8 issue link MYPROJ-9 MYPROJ-10 --type "Blocks"      # MYPROJ-9 blocks MYPROJ-10
+jira8 issue link A B --type "Relates" --comment "note"   # with an optional comment
+```
+
+The first key is the subject of the relation ("OUTWARD *phrase* INWARD"); for symmetric
+types like `Relates` the order is irrelevant. `--type` defaults to `Relates`.
+
 ### Comments
 
 ```bash
