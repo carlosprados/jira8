@@ -253,6 +253,25 @@ func (c *Client) DoTransition(ctx context.Context, key string, req *models.Trans
 	return err
 }
 
+// GetIssueLinkTypes returns the issue link types configured in the Jira instance.
+func (c *Client) GetIssueLinkTypes(ctx context.Context) ([]models.IssueLinkType, error) {
+	data, err := c.do(ctx, http.MethodGet, "/issueLinkType", nil)
+	if err != nil {
+		return nil, err
+	}
+	var resp models.IssueLinkTypesResponse
+	if err := json.Unmarshal(data, &resp); err != nil {
+		return nil, fmt.Errorf("parsing issue link types: %w", err)
+	}
+	return resp.IssueLinkTypes, nil
+}
+
+// LinkIssues creates a link between two issues (POST /issueLink).
+func (c *Client) LinkIssues(ctx context.Context, req *models.IssueLinkRequest) error {
+	_, err := c.do(ctx, http.MethodPost, "/issueLink", req)
+	return err
+}
+
 // AddWorklog adds a worklog entry to an issue.
 func (c *Client) AddWorklog(ctx context.Context, key string, req *models.AddWorklogRequest) (*models.Worklog, error) {
 	data, err := c.do(ctx, http.MethodPost, "/issue/"+url.PathEscape(key)+"/worklog", req)

@@ -274,6 +274,47 @@ type TransitionRef struct {
 	ID string `json:"id"`
 }
 
+// IssueLinkType is a Jira issue link type (e.g. "Relates", "Blocks").
+// Inward/Outward are the human-readable relationship phrases
+// (e.g. "is blocked by" / "blocks").
+type IssueLinkType struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	Inward  string `json:"inward"`
+	Outward string `json:"outward"`
+}
+
+// IssueLinkTypesResponse is the response from GET /rest/api/2/issueLinkType.
+type IssueLinkTypesResponse struct {
+	IssueLinkTypes []IssueLinkType `json:"issueLinkTypes"`
+}
+
+// IssueLinkTypeRef references a link type by name in a link request.
+type IssueLinkTypeRef struct {
+	Name string `json:"name"`
+}
+
+// LinkedIssueRef references an issue by key inside an issue-link request.
+type LinkedIssueRef struct {
+	Key string `json:"key"`
+}
+
+// IssueLinkComment is an optional comment posted alongside an issue link.
+type IssueLinkComment struct {
+	Body string `json:"body"`
+}
+
+// IssueLinkRequest is the POST body for /rest/api/2/issueLink. The outward
+// issue is the subject of the relationship ("OUTWARD <outward-phrase> INWARD",
+// e.g. "ESA-207 blocks ESA-214"). For symmetric types like "Relates" the
+// direction is irrelevant.
+type IssueLinkRequest struct {
+	Type         IssueLinkTypeRef  `json:"type"`
+	InwardIssue  LinkedIssueRef    `json:"inwardIssue"`
+	OutwardIssue LinkedIssueRef    `json:"outwardIssue"`
+	Comment      *IssueLinkComment `json:"comment,omitempty"`
+}
+
 // CreateIssueResponse is the response from POST /rest/api/2/issue.
 type CreateIssueResponse struct {
 	ID   string `json:"id"`
