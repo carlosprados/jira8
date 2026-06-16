@@ -71,7 +71,7 @@ func init() {
 // Execute runs the root command.
 func Execute() error {
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintf(rootCmd.ErrOrStderr(), "Error: %s\n", err)
+		_, _ = fmt.Fprintf(rootCmd.ErrOrStderr(), "Error: %s\n", err)
 		return err
 	}
 	return nil
