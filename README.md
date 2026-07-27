@@ -177,7 +177,13 @@ Error: project MYPROJ has 5 boards, specify one: "Team Kanban" (110, kanban), ..
 ```
 
 Up to 50 issues can be ranked in a single call. If the issues already occupy the
-requested edge, the command reports it and sends nothing.
+requested edge, the command reports it and sends nothing. Ranking an issue that is
+already at the top is a no-change operation, not an error.
+
+Ranking needs Jira Software (the Agile/Greenhopper plugin) — it uses the Agile API
+(`/rest/agile/1.0`), unlike every other command, which lives on `/rest/api/2`. The
+rank field is discovered per board, falling back to the instance-wide LexoRank
+field, so no custom field ID has to be configured.
 
 ### Links
 
@@ -390,5 +396,6 @@ Every capability exposed via Resources or Prompts is also reachable via Tools, s
 ## Target
 
 - Jira Server 8.7.1
-- REST API v2
+- REST API v2, plus the Agile API (`/rest/agile/1.0`) for board ranking
 - Authentication: Basic Auth (user:password) or Personal Access Token (Bearer)
+- Epic and ranking commands additionally require Jira Software (Agile/Greenhopper)
