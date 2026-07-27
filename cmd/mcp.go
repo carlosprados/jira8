@@ -131,6 +131,27 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 	)
 
 	s.AddTool(
+		mcp.NewTool("jira_rank_issue",
+			mcp.WithDescription("Reorder issues inside an Agile board column (kanban rank). "+
+				"Ranking changes only the vertical position of an issue within its column — it does NOT change its status; "+
+				"use jira_transition_issue to move an issue to another column. "+
+				"Exactly one of top, bottom, before or after must be given. "+
+				"top/bottom resolve the issue's own column and move it to the first/last position of that column."),
+			mcp.WithArray("keys",
+				mcp.WithStringItems(),
+				mcp.Description("Issue keys to move, up to 50, keeping their relative order (e.g. [\"ESA-123\"]). A single 'key' string is also accepted."),
+			),
+			mcp.WithString("key", mcp.Description("Single issue key, convenience alternative to 'keys' (e.g. ESA-123)")),
+			mcp.WithBoolean("top", mcp.Description("Move to the first position of the issue's column")),
+			mcp.WithBoolean("bottom", mcp.Description("Move to the last position of the issue's column")),
+			mcp.WithString("before", mcp.Description("Move immediately above this issue key")),
+			mcp.WithString("after", mcp.Description("Move immediately below this issue key")),
+			mcp.WithString("board", mcp.Description("Board ID or name; only needed by top/bottom when the issue's project has several boards. The error message lists the candidates.")),
+		),
+		rankIssueHandler(jc),
+	)
+
+	s.AddTool(
 		mcp.NewTool("jira_link_issues",
 			mcp.WithDescription("Link two Jira issues (e.g. Relates, Blocks, Duplicate). The type must be one of the names returned by jira_list_link_types; defaults to Relates."),
 			mcp.WithString("outward", mcp.Required(), mcp.Description("Outward issue key — subject of the relation, e.g. the one that 'blocks' (e.g. ESA-207)")),
@@ -993,6 +1014,66 @@ func listTransitionsHandler(jc *client.Client) server.ToolHandlerFunc {
 		}
 
 		return mcp.NewToolResultText(toJSON(transitions)), nil
+	}
+}
+
+// rankIssueHandler reorders issues within a board column. Mirrors
+// `jira8 issue rank`: accepts top/bottom (resolve the issue's own column and
+// move it to that edge) or before/after (explicit anchor issue). Returns the
+// resolved anchor, board and column so the agent can report what happened, and
+// reports noop:true when the issues already sat at the requested edge.
+func rankIssueHandler(jc *client.Client) server.ToolHandlerFunc {
+	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		keys := getStringArray(req, "keys")
+		if len(keys) == 0 {
+			if key := req.GetString("key", ""); key != "" {
+				keys = []string{key}
+			}
+		}
+		if len(keys) == 0 {
+			return mcp.NewToolResultError("no issues given: pass 'keys' (array of issue keys) or 'key' (single issue key)"), nil
+		}
+
+		top := req.GetBool("top", false)
+		bottom := req.GetBool("bottom", false)
+		before := req.GetString("before", "")
+		after := req.GetString("after", "")
+
+		// Reject ambiguity instead of silently picking one: a wrong guess here
+		// moves real issues on someone's board.
+		var given []string
+		for _, opt := range []struct {
+			name string
+			set  bool
+		}{{"top", top}, {"bottom", bottom}, {"before", before != ""}, {"after", after != ""}} {
+			if opt.set {
+				given = append(given, opt.name)
+			}
+		}
+		if len(given) != 1 {
+			return mcp.NewToolResultError(fmt.Sprintf(
+				"exactly one of top, bottom, before or after is required (got %d: %s)",
+				len(given), strings.Join(given, ", "))), nil
+		}
+
+		rr := client.RankRequest{Keys: keys, Board: req.GetString("board", "")}
+		switch {
+		case top:
+			rr.Position = client.RankTop
+		case bottom:
+			rr.Position = client.RankBottom
+		case before != "":
+			rr.Position, rr.Anchor = client.RankBefore, before
+		default:
+			rr.Position, rr.Anchor = client.RankAfter, after
+		}
+
+		result, err := jc.RankIssuesRelative(ctx, rr)
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		return mcp.NewToolResultText(toJSON(result)), nil
 	}
 }
 

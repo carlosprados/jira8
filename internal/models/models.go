@@ -407,3 +407,82 @@ type FieldSchema struct {
 	Items  string `json:"items,omitempty"`
 	Custom string `json:"custom,omitempty"`
 }
+
+// Board is an Agile (Greenhopper) board as returned by
+// GET /rest/agile/1.0/board. Type is "kanban" or "scrum".
+type Board struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+	Type string `json:"type,omitempty"`
+}
+
+// BoardsResponse is the paginated envelope returned by GET /rest/agile/1.0/board.
+// The Agile API paginates with isLast rather than the startAt/total arithmetic
+// used by /rest/api/2/search.
+type BoardsResponse struct {
+	MaxResults int     `json:"maxResults"`
+	StartAt    int     `json:"startAt"`
+	Total      int     `json:"total"`
+	IsLast     bool    `json:"isLast"`
+	Values     []Board `json:"values"`
+}
+
+// BoardConfiguration is returned by GET /rest/agile/1.0/board/{id}/configuration.
+// It is the only source for two things ranking needs: the board's saved filter
+// (to scope a JQL query to exactly what the board shows) and the column→statuses
+// mapping (to know which statuses make up a kanban column).
+type BoardConfiguration struct {
+	ID           int               `json:"id"`
+	Name         string            `json:"name"`
+	Type         string            `json:"type,omitempty"`
+	Filter       BoardFilter       `json:"filter"`
+	ColumnConfig BoardColumnConfig `json:"columnConfig"`
+	// Ranking carries the instance's rank custom field ID. Some boards return an
+	// empty object here, so callers must fall back to resolving SchemaRank via
+	// GET /rest/api/2/field.
+	Ranking *BoardRanking `json:"ranking,omitempty"`
+}
+
+// BoardFilter references the saved filter backing a board. The ID is a string in
+// the Agile API payload even though it is numeric.
+type BoardFilter struct {
+	ID string `json:"id"`
+}
+
+// BoardColumnConfig holds the ordered columns of a board, left to right.
+type BoardColumnConfig struct {
+	Columns []BoardColumn `json:"columns"`
+}
+
+// BoardColumn is a single board column. A column maps to zero or more statuses;
+// an issue belongs to the column whose Statuses contain the issue's status ID.
+// Columns with no statuses (a disabled kanban Backlog, for instance) hold nothing.
+type BoardColumn struct {
+	Name     string              `json:"name"`
+	Statuses []BoardColumnStatus `json:"statuses"`
+}
+
+// BoardColumnStatus references a status mapped to a column.
+type BoardColumnStatus struct {
+	ID string `json:"id"`
+}
+
+// BoardRanking carries the numeric ID of the LexoRank custom field used by the
+// board (e.g. 10200 for customfield_10200).
+type BoardRanking struct {
+	RankCustomFieldID int `json:"rankCustomFieldId,omitempty"`
+}
+
+// RankIssuesRequest is the PUT body for /rest/agile/1.0/issue/rank. Exactly one
+// of RankBeforeIssue / RankAfterIssue must be set; the moved issues keep their
+// relative order and land immediately before (or after) the anchor. Jira accepts
+// at most 50 issues per call.
+type RankIssuesRequest struct {
+	Issues          []string `json:"issues"`
+	RankBeforeIssue string   `json:"rankBeforeIssue,omitempty"`
+	RankAfterIssue  string   `json:"rankAfterIssue,omitempty"`
+	// RankCustomFieldID is optional per the API docs, but Jira Server instances
+	// can expose more than one rank field (an obsolete global rank alongside the
+	// LexoRank one), so we always send the resolved ID to stay unambiguous.
+	RankCustomFieldID int `json:"rankCustomFieldId,omitempty"`
+}
