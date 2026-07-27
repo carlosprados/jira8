@@ -21,12 +21,20 @@ const (
 	maxRetries  = 3
 	pageSize    = 50
 	apiBasePath = "/rest/api/2"
+	// agileBasePath is the Jira Software (Greenhopper) REST API. Boards, columns
+	// and issue ranking live here, not under /rest/api/2. The legacy
+	// /rest/greenhopper/1.0 endpoints are gone in Jira Server 8.
+	agileBasePath = "/rest/agile/1.0"
 
 	// Jira Server 8 schema identifiers for Greenhopper (Agile) custom fields.
 	// These are stable across instances; the numeric customfield_XXXXX IDs are NOT,
 	// which is why we resolve them dynamically via GET /field.
 	SchemaEpicName = "com.pyxis.greenhopper.jira:gh-epic-label"
 	SchemaEpicLink = "com.pyxis.greenhopper.jira:gh-epic-link"
+	// SchemaRank identifies the LexoRank field that drives the vertical order of
+	// board columns. Do not confuse it with "gh-global-rank", the obsolete
+	// pre-LexoRank field that some instances still expose.
+	SchemaRank = "com.pyxis.greenhopper.jira:gh-lexo-rank"
 )
 
 // APIError represents a Jira API error with status code and messages.
@@ -89,8 +97,20 @@ func New(cfg *config.Config) *Client {
 	}
 }
 
-// do executes an HTTP request against the Jira API with auth, retries, and error handling.
+// do executes an HTTP request against the Jira REST API v2 (/rest/api/2).
 func (c *Client) do(ctx context.Context, method, path string, body any) ([]byte, error) {
+	return c.doAt(ctx, method, apiBasePath+path, body)
+}
+
+// doAgile executes an HTTP request against the Jira Software Agile API
+// (/rest/agile/1.0), used for boards and issue ranking.
+func (c *Client) doAgile(ctx context.Context, method, path string, body any) ([]byte, error) {
+	return c.doAt(ctx, method, agileBasePath+path, body)
+}
+
+// doAt executes an HTTP request against an absolute API path (base included)
+// with auth, retries, and error handling.
+func (c *Client) doAt(ctx context.Context, method, apiPath string, body any) ([]byte, error) {
 	var bodyBytes []byte
 	if body != nil {
 		data, err := json.Marshal(body)
@@ -100,7 +120,7 @@ func (c *Client) do(ctx context.Context, method, path string, body any) ([]byte,
 		bodyBytes = data
 	}
 
-	fullURL := c.baseURL + apiBasePath + path
+	fullURL := c.baseURL + apiPath
 
 	for attempt := range maxRetries {
 		// Recreate the reader on every attempt; a retried request needs a fresh
@@ -561,4 +581,29 @@ func (c *Client) ResolveEpicFields(ctx context.Context) (epicNameID, epicLinkID 
 		return "", "", fmt.Errorf("epic fields not found on this Jira instance (Epic Name: %q, Epic Link: %q); is the Agile/Greenhopper plugin installed?", epicNameID, epicLinkID)
 	}
 	return epicNameID, epicLinkID, nil
+}
+
+// ResolveRankField returns the numeric ID of the LexoRank custom field on this
+// instance (e.g. 10200 for "customfield_10200"), matched on SchemaRank. Ranking
+// needs the bare number, both for the rank API payload and for JQL "cf[10200]"
+// ordering clauses. Used as a fallback when a board's configuration does not
+// report ranking.rankCustomFieldId.
+func (c *Client) ResolveRankField(ctx context.Context) (int, error) {
+	fields, err := c.GetFields(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	for _, f := range fields {
+		if f.Schema == nil || f.Schema.Custom != SchemaRank {
+			continue
+		}
+		id, err := strconv.Atoi(strings.TrimPrefix(f.ID, "customfield_"))
+		if err != nil {
+			return 0, fmt.Errorf("unexpected rank field ID %q: %w", f.ID, err)
+		}
+		return id, nil
+	}
+
+	return 0, fmt.Errorf("rank field not found on this Jira instance (schema %s); is Jira Software (Agile) installed?", SchemaRank)
 }

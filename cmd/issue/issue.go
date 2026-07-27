@@ -16,6 +16,7 @@ func init() {
 	IssueCmd.AddCommand(editCmd)
 	IssueCmd.AddCommand(transitionCmd)
 	IssueCmd.AddCommand(transitionsCmd)
+	IssueCmd.AddCommand(rankCmd)
 	IssueCmd.AddCommand(worklogAddCmd)
 	IssueCmd.AddCommand(worklogListCmd)
 	IssueCmd.AddCommand(worklogDeleteCmd)

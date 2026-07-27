@@ -154,6 +154,31 @@ jira8 issue transitions MYPROJ-123               # list available transitions
 jira8 issue transition MYPROJ-123 --to "Done"    # perform transition
 ```
 
+### Ranking (kanban order)
+
+Ranking changes the **vertical** position of an issue inside a board column. It
+never changes the status — moving an issue to another column is a transition.
+
+```bash
+jira8 issue rank MYPROJ-123 --top                       # first position of its column
+jira8 issue rank MYPROJ-123 --bottom                    # last position of its column
+jira8 issue rank MYPROJ-123 --before MYPROJ-99          # immediately above another issue
+jira8 issue rank MYPROJ-123 --after MYPROJ-99           # immediately below another issue
+jira8 issue rank MYPROJ-1 MYPROJ-2 --top --board 110    # a block, keeping relative order
+```
+
+`--top` / `--bottom` work out which column the issue currently sits in (from the
+board's status mapping) and move it to that column's edge. When the project has
+more than one board, pass `--board` with an ID or name; without it the error lists
+the candidates:
+
+```
+Error: project MYPROJ has 5 boards, specify one: "Team Kanban" (110, kanban), ...
+```
+
+Up to 50 issues can be ranked in a single call. If the issues already occupy the
+requested edge, the command reports it and sends nothing.
+
 ### Links
 
 ```bash
@@ -233,6 +258,7 @@ jira8 mcp serve
 | `jira_edit_issue` | Edit an existing issue (supports `epic_name`, `epic_link`, `attachments[]`) |
 | `jira_transition_issue` | Transition an issue |
 | `jira_list_transitions` | List available transitions |
+| `jira_rank_issue` | Reorder issues in a board column (`top`, `bottom`, `before`, `after`) |
 | `jira_add_comment` | Add a comment |
 | `jira_list_comments` | List comments |
 | `jira_edit_comment` | Edit an existing comment |
