@@ -11,11 +11,13 @@ import (
 )
 
 var editCmd = &cobra.Command{
-	Use:     "edit ISSUE-KEY",
-	Short:   "Edit an issue",
-	Example: "  jira8 issue edit ESA-123 --summary \"New title\" --assignee me",
-	Args:    cobra.ExactArgs(1),
-	RunE:    runEdit,
+	Use:   "edit ISSUE-KEY",
+	Short: "Edit an issue",
+	Example: `  jira8 issue edit ESA-123 --summary "New title" --assignee me
+  jira8 issue edit ESA-123 --due-date 2026-09-24 --original-estimate 5d
+  jira8 issue edit ESA-123 --due-date ""              # clear the due date`,
+	Args: cobra.ExactArgs(1),
+	RunE: runEdit,
 }
 
 func init() {
@@ -26,6 +28,8 @@ func init() {
 	editCmd.Flags().String("priority", "", "New priority")
 	editCmd.Flags().String("epic-name", "", "New Epic Name (only valid on Epic issues)")
 	editCmd.Flags().String("epic-link", "", "Epic key to associate this issue with (empty to detach)")
+	editCmd.Flags().String("due-date", "", "Due date, format YYYY-MM-DD (empty to clear)")
+	editCmd.Flags().String("original-estimate", "", "Original time estimate, Jira shorthand e.g. 3d, 5h, 30m")
 	editCmd.Flags().Bool("markdown", false, "Treat --description as Markdown and convert to Jira Wiki Markup before sending")
 	editCmd.Flags().StringArray("attach", nil, "Attach a file to the issue (repeatable). Can be used alone, without other field edits.")
 }
@@ -87,10 +91,24 @@ func runEdit(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	if cmd.Flags().Changed("due-date") {
+		v, _ := cmd.Flags().GetString("due-date")
+		if v == "" {
+			fields["duedate"] = nil
+		} else {
+			fields["duedate"] = v
+		}
+	}
+
+	if cmd.Flags().Changed("original-estimate") {
+		v, _ := cmd.Flags().GetString("original-estimate")
+		fields["timetracking"] = models.TimeTracking{OriginalEstimate: v}
+	}
+
 	attachFiles, _ := cmd.Flags().GetStringArray("attach")
 
 	if len(fields) == 0 && len(attachFiles) == 0 {
-		return fmt.Errorf("no fields to update; use --summary, --description, --assignee, --priority, --epic-name, --epic-link, or --attach")
+		return fmt.Errorf("no fields to update; use --summary, --description, --assignee, --priority, --epic-name, --epic-link, --due-date, --original-estimate, or --attach")
 	}
 
 	if len(fields) > 0 {
