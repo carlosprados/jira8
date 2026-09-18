@@ -258,6 +258,15 @@ type PriorityRef struct {
 	Name string `json:"name"`
 }
 
+// TimeTracking sets the "timetracking" field on create/edit. Jira Server 8
+// only accepts originalEstimate/remainingEstimate here (not the aggregate
+// *Seconds figures, which are read-only and computed from worklogs).
+// Duration strings use Jira's own shorthand: "3d", "5h", "30m".
+type TimeTracking struct {
+	OriginalEstimate  string `json:"originalEstimate,omitempty"`
+	RemainingEstimate string `json:"remainingEstimate,omitempty"`
+}
+
 // EditIssueRequest is the PUT body for /rest/api/2/issue/{key}.
 // Uses map for partial updates — only changed fields are sent.
 type EditIssueRequest struct {

@@ -104,6 +104,8 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 			mcp.WithString("priority", mcp.Description("New priority name")),
 			mcp.WithString("epic_name", mcp.Description("New Epic Name (only for Epics)")),
 			mcp.WithString("epic_link", mcp.Description("New Epic key to link to (empty string to detach)")),
+			mcp.WithString("due_date", mcp.Description("Due date, format YYYY-MM-DD (empty string to clear)")),
+			mcp.WithString("original_estimate", mcp.Description("Original time estimate, Jira shorthand e.g. 3d, 5h, 30m")),
 			mcp.WithArray("attachments",
 				mcp.WithStringItems(),
 				mcp.Description("Optional list of file paths to attach (uploaded after the field update). Paths are read on the host running this MCP server."),
@@ -597,6 +599,19 @@ func editIssueHandler(jc *client.Client) server.ToolHandlerFunc {
 					fields[epicLinkID] = s
 				}
 			}
+		}
+
+		if v, ok := args["due_date"]; ok {
+			s, _ := v.(string)
+			if s == "" {
+				fields["duedate"] = nil
+			} else {
+				fields["duedate"] = s
+			}
+		}
+		if v, ok := args["original_estimate"]; ok {
+			s, _ := v.(string)
+			fields["timetracking"] = models.TimeTracking{OriginalEstimate: s}
 		}
 
 		paths := getStringArray(req, "attachments")

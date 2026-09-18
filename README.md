@@ -124,7 +124,14 @@ jira8 issue edit MYPROJ-123 --assignee john.doe --priority Medium
 jira8 issue edit MYPROJ-123 --assignee ""              # unassign
 jira8 issue edit MYPROJ-123 --epic-link MYPROJ-42      # link to Epic
 jira8 issue edit MYPROJ-123 --epic-link ""             # detach from Epic
+jira8 issue edit MYPROJ-123 --due-date 2026-09-24 --original-estimate 5d
+jira8 issue edit MYPROJ-123 --due-date ""              # clear the due date
 ```
+
+`--due-date` sets Jira's `duedate` field (`YYYY-MM-DD`). `--original-estimate`
+sets `timetracking.originalEstimate`, in Jira's own shorthand (`3d`, `5h`,
+`30m`) — this is the up-front estimate, not time already spent; log actual
+hours worked with `issue worklog-add` instead.
 
 ### Epics
 
