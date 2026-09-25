@@ -406,3 +406,7 @@ Every capability exposed via Resources or Prompts is also reachable via Tools, s
 - REST API v2, plus the Agile API (`/rest/agile/1.0`) for board ranking
 - Authentication: Basic Auth (user:password) or Personal Access Token (Bearer)
 - Epic and ranking commands additionally require Jira Software (Agile/Greenhopper)
+
+## License
+
+[MIT](LICENSE) © Carlos Javier Prados Hijón
