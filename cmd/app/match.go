@@ -4,7 +4,7 @@ import "strings"
 
 // MatchByName returns a pointer to the first item whose name (extracted via
 // nameOf) matches target case-insensitively, or nil if none match. It backs the
-// "resolve a transition / link type by name" lookups shared by the CLI and MCP.
+// "resolve a transition / link type by name" lookups.
 func MatchByName[T any](items []T, target string, nameOf func(T) string) *T {
 	for i := range items {
 		if strings.EqualFold(nameOf(items[i]), target) {

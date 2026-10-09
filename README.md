@@ -1,6 +1,7 @@
 # jira8
 
-CLI tool for interacting with Jira Server 8 REST API v2, with MCP server support for AI agent integration.
+CLI tool for interacting with Jira Server 8 REST API v2. It ships with an agent
+skill so coding agents (Claude Code and others) can drive it from the shell.
 
 ## Quick Setup
 
@@ -283,9 +284,7 @@ jira8 issue comment-list MYPROJ-123 --markdown
 ```
 
 `--description-file`, `--body-file` and `--comment-file` read the text from a
-file, or from stdin with `-`. On the MCP side the same switch is the `format`
-parameter (`"wiki"` by default, or `"markdown"`): on write tools it converts
-the input, on read tools the output.
+file, or from stdin with `-`.
 
 Reading produces GitHub-flavoured Markdown and never HTML. What converts:
 
@@ -304,154 +303,34 @@ Reading produces GitHub-flavoured Markdown and never HTML. What converts:
 Emoticons, `+underline+`, `^sup^`, `~sub~`, `{toc}` and other macros stay
 literal. History values (`--with-history`) are never converted.
 
-## MCP Server
+## Agent skill
 
-Start as an MCP server (stdio transport) for AI agent integration:
-
-```bash
-jira8 mcp serve
-```
-
-### Available MCP tools
-
-| Tool | Description |
-|------|-------------|
-| `jira_list_issues` | List issues (supports `type`, `epic`, JQL, etc.) |
-| `jira_get_issue` | Get issue details (`include_history: true` adds the changelog) |
-| `jira_create_issue` | Create a new issue (supports `epic_name`, `epic_link`, `attachments[]`) |
-| `jira_edit_issue` | Edit an existing issue (supports `epic_name`, `epic_link`, `attachments[]`) |
-| `jira_transition_issue` | Transition an issue |
-| `jira_list_transitions` | List available transitions |
-| `jira_rank_issue` | Reorder issues in a board column (`top`, `bottom`, `before`, `after`) |
-| `jira_link_issues` | Link two issues (`Relates`, `Blocks`, …) with an optional comment |
-| `jira_list_link_types` | List the available issue link types |
-| `jira_add_comment` | Add a comment |
-| `jira_list_comments` | List comments |
-| `jira_edit_comment` | Edit an existing comment |
-| `jira_delete_comment` | Delete a comment |
-| `jira_add_worklog` | Add a worklog entry |
-| `jira_list_worklogs` | List worklog entries |
-| `jira_delete_worklog` | Delete a worklog entry |
-| `jira_add_attachment` | Upload one or more files to an issue |
-| `jira_list_attachments` | List attachments on an issue |
-| `jira_delete_attachment` | Delete an attachment by ID |
-| `jira_list_issue_types` | List issue types for a project |
-| `jira_list_statuses` | List statuses grouped by issue type |
-| `jira_list_priorities` | List available priorities |
-| `jira_list_epics` | List Epics in a project |
-| `jira_list_epic_children` | List issues linked to an Epic |
-| `jira_create_epic` | Create an Epic (shortcut for `jira_create_issue` with `type=Epic`) |
-| `jira_edit_epic` | Edit an Epic (exposes friendly `name` for Epic Name) |
-| `jira_view_epic` | Get an Epic and (optionally) its linked children in one call |
-
-> **Attachment paths and MCP security.** `jira_add_attachment`, and the
-> `attachments[]` parameters on `jira_create_issue` / `jira_edit_issue`, read
-> files from the filesystem of the host running `jira8 mcp serve` — **not** the
-> agent's client machine. When jira8 runs on the same host as the user (typical
-> Claude Desktop / Claude Code setup) this is transparent. When jira8 runs on a
-> shared or remote host, it widens the blast radius: an agent that can call
-> these tools can upload any file the jira8 process can read. Treat the MCP
-> server's file access as part of the trust boundary.
-
-### Available MCP resources
-
-Resources expose Jira data by URI. Clients that support them (Claude Code, Gemini CLI with experimental support) let the user attach these to the conversation without spending a tool call. Clients that only do tools (LM Studio) fall back to the equivalent `jira_list_*` / `jira_get_issue` tools.
-
-| URI | Description |
-|------|-------------|
-| `jira://priorities` | Global priorities list |
-| `jira://projects/{key}/types` | Issue types valid in a project |
-| `jira://projects/{key}/statuses` | Statuses grouped by issue type |
-| `jira://issues/{key}` | Full issue payload (includes raw custom fields) |
-| `jira://issues/{key}/comments` | Comment thread on an issue |
-| `jira://issues/{key}/worklogs` | Worklog entries on an issue |
-| `jira://issues/{key}/transitions` | Workflow transitions available right now |
-| `jira://epics/{key}/children` | Issues linked to an Epic via Epic Link |
-
-In Claude Code: reference them with `@jira:jira://...` in the prompt.
-
-### Available MCP prompts
-
-Prompts are reusable conversational templates. Claude Code surfaces them as `/mcp__jira__<name>`; Gemini CLI as `/<name>`. LM Studio does not support prompts — the equivalent workflow is to call the underlying tools directly.
-
-| Prompt | Required arguments | Purpose |
-|--------|--------------------|---------|
-| `triage_issue` | `key` | Loads an issue and asks for a structured triage (priority, missing info, labels, assignee) |
-| `create_bug_report` | `summary`, `steps_to_reproduce`, `expected_behavior`, `actual_behavior` (+ optional `environment`, `project`) | Builds a well-formed Bug report ready to file via `jira_create_issue` |
-| `epic_breakdown` | `epic_key` | Loads an Epic + its children and proposes missing stories/sub-tasks |
-| `summarise_comments` | `key` | Loads an issue's comment thread and extracts decisions, open questions and pending actions |
-
-### Claude Code integration
-
-Add the server with the `claude` CLI (recommended):
+The binary embeds a skill document (`SKILL.md`) that teaches a coding agent how
+to use jira8: commands, `-o json` output, Markdown conversion, the change
+history and the Jira Server 8 pitfalls. Install it where the agent looks for
+skills:
 
 ```bash
-claude mcp add jira /path/to/jira8 mcp serve
+jira8 skill install              # ~/.claude/skills/jira8/SKILL.md
+jira8 skill install --project    # ./.claude/skills/jira8/SKILL.md
+jira8 skill show                 # print it
 ```
 
-Or, edit `.mcp.json` (project) / `~/.claude.json` (user) by hand:
+`task install` installs the skill together with the binary. After upgrading
+jira8 by other means, run `jira8 skill install --force` so the skill matches
+the binary. No Jira configuration is needed for these commands.
 
-```json
-{
-  "mcpServers": {
-    "jira": {
-      "command": "/path/to/jira8",
-      "args": ["mcp", "serve"]
-    }
-  }
-}
-```
+Any agent with a shell can use jira8 this way; the skill is plain Markdown, so
+agents without a skills directory can be pointed at `jira8 skill show`.
 
-After adding, run `/mcp` inside Claude Code to verify the server shows up
-and lists tools, resources and prompts.
+### Migrating from v1 (MCP server removed)
 
-### Claude Desktop integration
-
-Edit Claude Desktop's MCP config and add the same server entry:
-
-- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
-- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
-- Linux: `~/.config/Claude/claude_desktop_config.json`
-
-```json
-{
-  "mcpServers": {
-    "jira": {
-      "command": "/path/to/jira8",
-      "args": ["mcp", "serve"]
-    }
-  }
-}
-```
-
-Restart Claude Desktop after editing. The Jira tools, resources and prompts
-will appear in the connectors panel.
-
-> **Tip — credentials.** The MCP server inherits the same configuration as
-> the CLI: `~/.jira.yaml`, `JIRA_*` environment variables, or flags. To pass
-> credentials only to the MCP server, add an `env` block:
->
-> ```json
-> {
->   "mcpServers": {
->     "jira": {
->       "command": "/path/to/jira8",
->       "args": ["mcp", "serve"],
->       "env": { "JIRA_TOKEN": "...", "JIRA_URL": "https://jira.example.com/jira" }
->     }
->   }
-> }
-> ```
-
-### Client support matrix
-
-| Primitive | Claude Code | Gemini CLI | LM Studio |
-|-----------|:-----------:|:----------:|:---------:|
-| Tools | ✓ | ✓ | ✓ |
-| Resources | ✓ | experimental | — |
-| Prompts | ✓ | ✓ | — |
-
-Every capability exposed via Resources or Prompts is also reachable via Tools, so all three clients keep feature parity at the functional level.
+v2 drops `jira8 mcp serve` and its tools, resources and prompts: every
+capability was already a CLI subcommand, agents with a shell use the CLI, and
+keeping two surfaces in sync cost more than it gave. Remove the server from
+your client (`claude mcp remove jira`, or the `jira8` entry under `mcpServers`)
+and install the skill. If you need the MCP server, stay on
+[v1.9.0](https://github.com/carlosprados/jira8/releases/tag/v1.9.0).
 
 ## Target
 

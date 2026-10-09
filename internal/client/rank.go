@@ -117,8 +117,7 @@ func (c *Client) RankIssues(ctx context.Context, req *models.RankIssuesRequest) 
 // RankIssuesRelative moves issues within the board's rank order. For RankTop and
 // RankBottom it resolves the issue's own column on the board and picks the first
 // (or last) issue of that column as the anchor, so "top" means "top of the
-// column the issue is already in". Shared by the CLI `issue rank` command and
-// the jira_rank_issue MCP tool so both resolve boards and columns identically.
+// column the issue is already in".
 func (c *Client) RankIssuesRelative(ctx context.Context, req RankRequest) (*RankResult, error) {
 	if len(req.Keys) == 0 {
 		return nil, fmt.Errorf("no issues to rank")

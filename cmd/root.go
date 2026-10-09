@@ -65,7 +65,7 @@ func init() {
 	rootCmd.AddCommand(issue.IssueCmd)
 	rootCmd.AddCommand(epic.EpicCmd)
 	rootCmd.AddCommand(project.ProjectCmd)
-	rootCmd.AddCommand(mcpCmd)
+	rootCmd.AddCommand(skillCmd)
 }
 
 // Execute runs the root command.

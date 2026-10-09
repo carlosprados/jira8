@@ -39,12 +39,14 @@ tasks:
       - go test ./...
 
   install:
-    desc: Build and install jira8 to user PATH
+    desc: Build and install jira8 to $PREFIX/bin, plus its agent skill
     deps: [build]
     cmds:
       - mkdir -p {{.INSTALL_DIR}}
       - cp {{.BINARY}} {{.INSTALL_DIR}}/{{.BINARY}}
       - echo "Installed {{.BINARY}} {{.VERSION}} to {{.INSTALL_DIR}}/{{.BINARY}}"
+      # Keep the agent skill in step with the binary.
+      - "{{.INSTALL_DIR}}/{{.BINARY}} skill install --force"
 
   setup-config:
     desc: Copy example config to ~/.jira.yaml (will NOT overwrite existing)
