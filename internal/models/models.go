@@ -19,6 +19,33 @@ type Issue struct {
 	Key    string      `json:"key"`
 	Self   string      `json:"self"`
 	Fields IssueFields `json:"fields"`
+	// Changelog is only filled when requested (GET /issue/{key}?expand=changelog):
+	// who changed which field, from what to what, oldest first.
+	Changelog *Changelog `json:"changelog,omitempty"`
+}
+
+// Changelog is the issue history returned by expand=changelog.
+type Changelog struct {
+	Total     int       `json:"total"`
+	Histories []History `json:"histories"`
+}
+
+// History is one edit of an issue: an author, a time and the fields changed.
+type History struct {
+	ID      string        `json:"id"`
+	Author  *User         `json:"author,omitempty"`
+	Created string        `json:"created"`
+	Items   []HistoryItem `json:"items"`
+}
+
+// HistoryItem is one field change; FromString/ToString are the readable values.
+type HistoryItem struct {
+	Field      string `json:"field"`
+	FieldType  string `json:"fieldtype"`
+	From       string `json:"from,omitempty"`
+	FromString string `json:"fromString,omitempty"`
+	To         string `json:"to,omitempty"`
+	ToString   string `json:"toString,omitempty"`
 }
 
 // IssueFields contains the fields of a Jira issue.

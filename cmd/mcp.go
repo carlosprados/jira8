@@ -69,6 +69,7 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 			mcp.WithDescription("Get detailed information about a Jira issue"),
 			mcp.WithString("key", mcp.Required(), mcp.Description("Issue key (e.g. ESA-123)")),
 			mcp.WithString("format", mcp.Description(formatParamDescription)),
+			mcp.WithBoolean("include_history", mcp.Description("Include the issue history (changelog): who changed which field (status, assignee, priority…), when, from and to. Values longer than 200 chars or multi-line (e.g. description edits) are trimmed to their first line plus \"… (N chars)\"")),
 		),
 		getIssueHandler(jc),
 	)
@@ -443,7 +444,11 @@ func getIssueHandler(jc *client.Client) server.ToolHandlerFunc {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
-		issue, err := jc.GetIssue(ctx, key)
+		get := jc.GetIssue
+		if req.GetBool("include_history", false) {
+			get = jc.GetIssueWithChangelog
+		}
+		issue, err := get(ctx, key)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
@@ -451,6 +456,7 @@ func getIssueHandler(jc *client.Client) server.ToolHandlerFunc {
 		if isMarkdownFormat(req.GetString("format", "")) {
 			app.RenderIssueAsMarkdown(issue)
 		}
+		app.TrimHistory(issue, app.HistoryValueMax)
 
 		return mcp.NewToolResultText(toJSON(issue)), nil
 	}

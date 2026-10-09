@@ -227,7 +227,21 @@ func (c *Client) SearchAllIssues(ctx context.Context, jql string, max int, extra
 
 // GetIssue fetches a single issue by key.
 func (c *Client) GetIssue(ctx context.Context, key string) (*models.Issue, error) {
-	data, err := c.do(ctx, http.MethodGet, "/issue/"+url.PathEscape(key), nil)
+	return c.getIssue(ctx, key, false)
+}
+
+// GetIssueWithChangelog fetches an issue with its history (expand=changelog):
+// status, assignee, priority… changes with author and time.
+func (c *Client) GetIssueWithChangelog(ctx context.Context, key string) (*models.Issue, error) {
+	return c.getIssue(ctx, key, true)
+}
+
+func (c *Client) getIssue(ctx context.Context, key string, changelog bool) (*models.Issue, error) {
+	path := "/issue/" + url.PathEscape(key)
+	if changelog {
+		path += "?expand=changelog"
+	}
+	data, err := c.do(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
 	}

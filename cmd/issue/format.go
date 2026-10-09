@@ -256,3 +256,28 @@ func printTransitions(transitions []models.Transition) {
 		fmt.Printf("%-6s  %-25s  %s\n", t.ID, t.Name, target)
 	}
 }
+
+// printHistory renders the changelog fetched with --with-history, newest
+// first. Values are expected to be trimmed already (app.TrimHistory).
+func printHistory(issue *models.Issue) {
+	if issue.Changelog == nil || len(issue.Changelog.Histories) == 0 {
+		return
+	}
+	hs := issue.Changelog.Histories
+	fmt.Printf(labelStyle.Render("History (%d):")+"\n", len(hs))
+	for i := len(hs) - 1; i >= 0; i-- {
+		h := hs[i]
+		fmt.Printf("\n  %s  %s\n", headerStyle.Render(userName(h.Author)), labelStyle.Render(h.Created))
+		for _, it := range h.Items {
+			fmt.Printf("    %s: %s → %s\n", it.Field, orDash(it.FromString), orDash(it.ToString))
+		}
+	}
+	fmt.Println()
+}
+
+func orDash(s string) string {
+	if s == "" {
+		return "-"
+	}
+	return s
+}
