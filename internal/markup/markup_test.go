@@ -217,6 +217,69 @@ func TestWikiToMarkdown(t *testing.T) {
 		},
 
 		{
+			"noformat is a fence and keeps its content",
+			"{noformat}\n* Trying 10.0.0.1...\n_not italic_\n{noformat}",
+			"```\n* Trying 10.0.0.1...\n_not italic_\n```",
+		},
+		{
+			"code tags sharing a line with text",
+			"$ kafka-configs --describe {code}\nDefault configs are: {code}",
+			"$ kafka-configs --describe\n```\nDefault configs are:\n```",
+		},
+		{
+			"code open tag followed by content on the same line",
+			"{code:java}\"filter\":{\n}{code}",
+			"```java\n\"filter\":{\n}\n```",
+		},
+		{
+			"code with parameters",
+			"{code:title=Foo.java|borderStyle=solid|java}\nx\n{code}",
+			"```java\nx\n```",
+		},
+		{
+			"noformat inside code is literal",
+			"{code}\n{noformat}\n{code}",
+			"```\n{noformat}\n```",
+		},
+		{
+			"inline code with braces inside",
+			"via {{POST /devices/{deviceId}/collect}} now",
+			"via `POST /devices/{deviceId}/collect` now",
+		},
+		{
+			"unclosed inline code does not swallow the next span",
+			"see {{a.b}) and {{c}}",
+			"see {{a.b}) and `c`",
+		},
+		{
+			"inline code containing a backtick",
+			"run {{echo `date`}}",
+			"run `` echo `date` ``",
+		},
+		{
+			"inline code is not a block tag",
+			"the {{code}} macro",
+			"the `code` macro",
+		},
+		{"mention", "[~jesus.martin@amplia.es] please check", "@jesus.martin@amplia.es please check"},
+		{"bare url link", "see [https://example.com/a_b_c]", "see <https://example.com/a_b_c>"},
+		{"issue reference", "fixed in [PHO-5394]", "fixed in PHO-5394"},
+		{
+			"underscores in a link url are not italic",
+			"[script|http://git/ft02_probando_frontend/x.sh]",
+			"[script](http://git/ft02_probando_frontend/x.sh)",
+		},
+		{"color dropped", "{color:#ff0000}red{color} text", "red text"},
+		{"anchor dropped", "h2. {anchor:}Notas", "## Notas"},
+		{"panel tags dropped", "{panel:title=Note}\ninside\n{panel}", "inside"},
+		{"image with params", "!shot.png|thumbnail!", "![shot.png](shot.png)"},
+		{
+			"table without header gets an empty one",
+			"|PHO-1|fix|\n|PHO-2|feat|",
+			"|  |  |\n| --- | --- |\n| PHO-1 | fix |\n| PHO-2 | feat |",
+		},
+
+		{
 			"complex mixed document",
 			"h1. Plan\n\nWe need to ship *soon*.\n\n* spec the {{API}}\n* write tests\n\n{code:go}\nfunc main() {}\n{code}\n\nSee [tracker|https://example.com].",
 			"# Plan\n\nWe need to ship **soon**.\n\n- spec the `API`\n- write tests\n\n```go\nfunc main() {}\n```\n\nSee [tracker](https://example.com).",
