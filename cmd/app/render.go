@@ -2,6 +2,9 @@ package app
 
 import (
 	"encoding/json"
+	"fmt"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/amplia/jira8/internal/markup"
 	"github.com/amplia/jira8/internal/models"
@@ -50,6 +53,41 @@ func RenderWorklogsAsMarkdown(worklogs []models.Worklog) {
 	for i := range worklogs {
 		worklogs[i].Comment = markup.WikiToMarkdown(worklogs[i].Comment)
 	}
+}
+
+// HistoryValueMax is the rune budget for a history value in terminal and MCP
+// output. Long-text fields (description, environment) store the whole text on
+// every edit: PHO-2466 carries 787 KB of description history in 4 entries.
+const HistoryValueMax = 200
+
+// TrimHistory shortens every changelog value of the issue to its first line
+// and at most max runes, appending "… (N chars)" when something was cut. CLI
+// `-o json` skips it so the full values stay available for diffing.
+func TrimHistory(issue *models.Issue, max int) {
+	if issue == nil || issue.Changelog == nil {
+		return
+	}
+	for i := range issue.Changelog.Histories {
+		items := issue.Changelog.Histories[i].Items
+		for j := range items {
+			items[j].From = trimValue(items[j].From, max)
+			items[j].FromString = trimValue(items[j].FromString, max)
+			items[j].To = trimValue(items[j].To, max)
+			items[j].ToString = trimValue(items[j].ToString, max)
+		}
+	}
+}
+
+func trimValue(s string, max int) string {
+	line, _, multiline := strings.Cut(s, "\n")
+	runes := []rune(strings.TrimRight(line, "\r"))
+	if !multiline && len(runes) <= max {
+		return s
+	}
+	if len(runes) > max {
+		runes = runes[:max]
+	}
+	return fmt.Sprintf("%s… (%d chars)", string(runes), utf8.RuneCountInString(s))
 }
 
 // syncRawWithTyped overwrites the description and comment entries in

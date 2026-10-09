@@ -105,7 +105,12 @@ jira8 issue list --max 100                    # up to 100 results
 ```bash
 jira8 issue view MYPROJ-123
 jira8 issue view MYPROJ-123 -o json
+jira8 issue view MYPROJ-123 --with-history       # + History: who changed which field, when
 ```
+
+History values longer than 200 characters or spanning several lines (typically
+description edits, which store the whole text every time) are trimmed to their
+first line plus `… (N chars)`. With `-o json` they come back in full.
 
 ### Create issue
 
@@ -266,7 +271,7 @@ jira8 mcp serve
 | Tool | Description |
 |------|-------------|
 | `jira_list_issues` | List issues (supports `type`, `epic`, JQL, etc.) |
-| `jira_get_issue` | Get issue details |
+| `jira_get_issue` | Get issue details (`include_history: true` adds the changelog) |
 | `jira_create_issue` | Create a new issue (supports `epic_name`, `epic_link`, `attachments[]`) |
 | `jira_edit_issue` | Edit an existing issue (supports `epic_name`, `epic_link`, `attachments[]`) |
 | `jira_transition_issue` | Transition an issue |
