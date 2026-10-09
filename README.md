@@ -13,7 +13,8 @@ task setup
 This will:
 
 1. Build the binary
-2. Install it to `~/bin` (Windows) or `~/.local/bin` (Linux)
+2. Install it to `$PREFIX/bin`: `~/.local/bin` by default (`~/bin` on Windows).
+   Override with `PREFIX=/opt/tools task setup`
 3. Create `~/.jira.yaml` from the example template
 
 Then edit `~/.jira.yaml` with your credentials and verify:
@@ -28,7 +29,7 @@ task verify
 |------|-------------|
 | `task setup` | Full setup: build + install + create config |
 | `task build` | Build the binary |
-| `task install` | Build and copy to user PATH |
+| `task install` | Build (with version info) and copy to `$PREFIX/bin` |
 | `task setup-config` | Copy config template to `~/.jira.yaml` |
 | `task verify` | Check binary and config are OK |
 | `task lint` | Run gofmt + go vet |

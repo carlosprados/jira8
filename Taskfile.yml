@@ -2,7 +2,19 @@ version: "3"
 
 vars:
   BINARY: jira8{{if eq OS "windows"}}.exe{{end}}
-  INSTALL_DIR: '{{if eq OS "windows"}}{{.HOME}}/bin{{else}}{{.HOME}}/.local/bin{{end}}'
+  # Install under $PREFIX/bin (default ~/.local/bin, ~/bin on Windows):
+  #   PREFIX=/opt/tools task install
+  PREFIX: '{{.PREFIX | default (printf "%s%s" .HOME (ternary "" "/.local" (eq OS "windows")))}}'
+  INSTALL_DIR: '{{.PREFIX}}/bin'
+  VERSION:
+    sh: git describe --tags --always --dirty 2>/dev/null | sed 's/^v//' || echo dev
+  COMMIT:
+    sh: git rev-parse --short HEAD 2>/dev/null || echo none
+  LDFLAGS: >-
+    -s -w
+    -X github.com/amplia/jira8/cmd.version={{.VERSION}}
+    -X github.com/amplia/jira8/cmd.commit={{.COMMIT}}
+    -X github.com/amplia/jira8/cmd.date={{now | date "2006-01-02T15:04:05Z07:00"}}
 
 tasks:
   default:
@@ -13,13 +25,7 @@ tasks:
   build:
     desc: Build the jira8 binary
     cmds:
-      - go build -o {{.BINARY}} .
-    sources:
-      - "**/*.go"
-      - go.mod
-      - go.sum
-    generates:
-      - "{{.BINARY}}"
+      - go build -ldflags "{{.LDFLAGS}}" -o {{.BINARY}} .
 
   lint:
     desc: Run linters
@@ -38,10 +44,7 @@ tasks:
     cmds:
       - mkdir -p {{.INSTALL_DIR}}
       - cp {{.BINARY}} {{.INSTALL_DIR}}/{{.BINARY}}
-      - echo "Installed {{.BINARY}} to {{.INSTALL_DIR}}/{{.BINARY}}"
-    status:
-      - test -f {{.INSTALL_DIR}}/{{.BINARY}}
-      - test {{.INSTALL_DIR}}/{{.BINARY}} -nt {{.BINARY}}
+      - echo "Installed {{.BINARY}} {{.VERSION}} to {{.INSTALL_DIR}}/{{.BINARY}}"
 
   setup-config:
     desc: Copy example config to ~/.jira.yaml (will NOT overwrite existing)
