@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "jira8": {
-      "command": "./jira8",
-      "args": ["mcp", "serve"]
-    }
-  }
-}
