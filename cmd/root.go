@@ -27,6 +27,9 @@ var rootCmd = &cobra.Command{
 	Short: "CLI for Jira Server 8",
 	Long:  "A command-line interface for interacting with Jira Server 8 REST API.",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		// Flags and args are already validated here, so from now on an error
+		// is a runtime one (config, Jira API): print it without the usage.
+		cmd.SilenceUsage = true
 		if cmd.Name() == "help" || cmd.Name() == "completion" {
 			return nil
 		}
@@ -43,7 +46,6 @@ var rootCmd = &cobra.Command{
 		})
 		return nil
 	},
-	SilenceUsage:  false,
 	SilenceErrors: true,
 }
 

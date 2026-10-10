@@ -14,7 +14,10 @@ var skillCmd = &cobra.Command{
 	Use:   "skill",
 	Short: "Agent skill (SKILL.md) shipped with this binary",
 	// No Jira config needed: overrides the root hook for the whole subtree.
-	PersistentPreRunE: func(*cobra.Command, []string) error { return nil },
+	PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+		cmd.SilenceUsage = true
+		return nil
+	},
 	Long: `jira8 ships with a skill document for coding agents (Claude Code and anything
 else that reads a skills directory). It covers the commands, the JSON output,
 Markdown conversion and the Jira Server 8 pitfalls, so an agent uses the CLI

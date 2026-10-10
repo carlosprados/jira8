@@ -148,9 +148,9 @@ ask**: it deletes immediately. Nothing deleted can be recovered.
 
 ## Errors
 
-Errors print Jira's own messages (`field: message` for field errors, or
-`Jira API error (HTTP n)` when Jira sends none) and exit 1; the command usage
-follows the error, ignore it. A field error usually means an invalid name:
-check `project types|statuses|priorities` or `issue transitions`. An issue that
-"does not exist" may just be invisible to the user. Rate limiting (HTTP 429) is
-retried automatically.
+Jira errors read `Error: Jira API error (HTTP n): message; field: message` and
+exit 1. A `400` naming a field usually means an invalid name: check
+`project types|statuses|priorities` or `issue transitions`. `401` is bad
+credentials, `403` no permission, and `404` "Issue Does Not Exist" may just mean
+the issue is not visible to the user. `429` (rate limit) is retried
+automatically. Only a wrong flag or argument prints the command usage.
