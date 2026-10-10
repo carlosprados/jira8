@@ -59,7 +59,7 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 			mcp.WithString("epic", mcp.Description("Filter issues linked to this Epic key (e.g. ESA-42)")),
 			mcp.WithString("jql", mcp.Description("Raw JQL query (overrides other filters)")),
 			mcp.WithNumber("max", mcp.Description("Maximum number of results (default 50)")),
-			mcp.WithString("format", mcp.Description(formatParamDescription)),
+			mcp.WithString("format", mcp.Description(formatReadParamDescription)),
 		),
 		listIssuesHandler(jc, a.Config.Project),
 	)
@@ -68,7 +68,7 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 		mcp.NewTool("jira_get_issue",
 			mcp.WithDescription("Get detailed information about a Jira issue"),
 			mcp.WithString("key", mcp.Required(), mcp.Description("Issue key (e.g. ESA-123)")),
-			mcp.WithString("format", mcp.Description(formatParamDescription)),
+			mcp.WithString("format", mcp.Description(formatReadParamDescription)),
 			mcp.WithBoolean("include_history", mcp.Description("Include the issue history (changelog): who changed which field (status, assignee, priority…), when, from and to. Values longer than 200 chars or multi-line (e.g. description edits) are trimmed to their first line plus \"… (N chars)\"")),
 		),
 		getIssueHandler(jc),
@@ -188,7 +188,7 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 		mcp.NewTool("jira_list_worklogs",
 			mcp.WithDescription("List worklog entries for a Jira issue"),
 			mcp.WithString("key", mcp.Required(), mcp.Description("Issue key (e.g. ESA-123)")),
-			mcp.WithString("format", mcp.Description(formatParamDescription)),
+			mcp.WithString("format", mcp.Description(formatReadParamDescription)),
 		),
 		listWorklogsHandler(jc),
 	)
@@ -216,7 +216,7 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 		mcp.NewTool("jira_list_comments",
 			mcp.WithDescription("List comments on a Jira issue"),
 			mcp.WithString("key", mcp.Required(), mcp.Description("Issue key (e.g. ESA-123)")),
-			mcp.WithString("format", mcp.Description(formatParamDescription)),
+			mcp.WithString("format", mcp.Description(formatReadParamDescription)),
 		),
 		listCommentsHandler(jc),
 	)
@@ -299,7 +299,7 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 			mcp.WithString("project", mcp.Description("Project key (e.g. ESA)")),
 			mcp.WithString("status", mcp.Description("Filter by status name")),
 			mcp.WithNumber("max", mcp.Description("Maximum number of results (default 50)")),
-			mcp.WithString("format", mcp.Description(formatParamDescription)),
+			mcp.WithString("format", mcp.Description(formatReadParamDescription)),
 		),
 		listEpicsHandler(jc, a.Config.Project),
 	)
@@ -309,7 +309,7 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 			mcp.WithDescription("List issues linked to an Epic (Epic Link = KEY)"),
 			mcp.WithString("key", mcp.Required(), mcp.Description("Epic issue key (e.g. ESA-42)")),
 			mcp.WithNumber("max", mcp.Description("Maximum number of results (default 100)")),
-			mcp.WithString("format", mcp.Description(formatParamDescription)),
+			mcp.WithString("format", mcp.Description(formatReadParamDescription)),
 		),
 		listEpicChildrenHandler(jc),
 	)
@@ -348,7 +348,7 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 			mcp.WithString("key", mcp.Required(), mcp.Description("Epic issue key (e.g. ESA-42)")),
 			mcp.WithBoolean("include_children", mcp.Description("Include linked children in the response (default true)")),
 			mcp.WithNumber("max_children", mcp.Description("Maximum children to return (default 100)")),
-			mcp.WithString("format", mcp.Description(formatParamDescription)),
+			mcp.WithString("format", mcp.Description(formatReadParamDescription)),
 		),
 		viewEpicHandler(jc),
 	)
@@ -379,6 +379,10 @@ func isMarkdownFormat(format string) bool {
 }
 
 const formatParamDescription = `Input format for free-form text fields ("wiki" default, or "markdown" to convert from Markdown to Jira Wiki Markup before sending)`
+
+// formatReadParamDescription is the `format` description on read tools, where
+// the conversion goes the other way: Jira Wiki Markup to Markdown on output.
+const formatReadParamDescription = `Output format for descriptions, comment bodies and worklog comments ("wiki" default, or "markdown" to convert them from Jira Wiki Markup to GitHub-flavoured Markdown; history values are not converted)`
 
 // getStringArray extracts a []string from the MCP request arguments under name.
 // MCP transports an array param as []any, so we narrow it element by element

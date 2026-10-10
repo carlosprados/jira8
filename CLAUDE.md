@@ -11,21 +11,23 @@ go test ./...                  # run all tests
 go test ./internal/client/...  # run tests for a single package
 ```
 
-Requires a `~/.jira.yaml` with a `token` field (or `JIRA_TOKEN` env var) to run against the real Jira instance.
+Requires a `~/.jira.yaml` with `url` and either `token` or `user` + `password` (or the `JIRA_*` env vars) to run against the real Jira instance.
 
 ## Architecture
 
-This is a Go CLI tool targeting **Jira Server 8.7.1 REST API v2** (`https://jira.amplia.es/jira`). It has two modes: interactive CLI and MCP server (stdio transport for AI agent integration).
+This is a Go CLI tool targeting **Jira Server 8.7.1 REST API v2** (`https://jira.amplia.es/jira`), plus the Agile API (`/rest/agile/1.0`) for board ranking only. It has two modes: interactive CLI and MCP server (stdio transport for AI agent integration).
 
 ### Key layers
 
 - **`cmd/root.go`** — Cobra root command. `PersistentPreRunE` loads config, creates the HTTP client, and stores both in `cmd/app.State` (a package-level singleton to avoid circular imports between `cmd` and `cmd/issue`).
-- **`cmd/app/`** — Shared state holder (`State` struct with Config, Client, Output). All subcommands access it via `app.Get()`.
-- **`cmd/issue/`** — One file per subcommand (list, view, create, edit, transition). `format.go` has all terminal rendering helpers using lipgloss.
+- **`cmd/app/`** — Shared state holder (`State` struct with Config, Client, Output; all subcommands access it via `app.Get()`) plus helpers shared by CLI and MCP: text input from flag/file/stdin, `OutputJSON`, name matching, Markdown rendering of read results and `TrimHistory`.
+- **`cmd/issue/`** — One file per subcommand (list, view, create, edit, transition(s), rank, link, comment-*, worklog-*, attachment). `format.go` has all terminal rendering helpers using lipgloss.
+- **`cmd/epic/`**, **`cmd/project/`** — Epic CRUD + children, and read-only project metadata (types, statuses, priorities).
 - **`cmd/mcp.go`** — MCP server using `mark3labs/mcp-go`. Registers all tools and wires up resources and prompts. Tool errors return `mcp.NewToolResultError()` (tool-level), not Go errors (transport-level).
-- **`cmd/mcp_resources.go`** — Read-only `jira://` resources and resource templates (priorities, project types, project statuses, individual issue). Handlers return `application/json`.
-- **`cmd/mcp_prompts.go`** — Reusable conversational prompts (`triage_issue`, `create_bug_report`, `epic_breakdown`) that pre-load Jira context and produce structured `PromptMessage`s. No CLI counterpart (see paridad rules below).
-- **`internal/client/jira.go`** — Single HTTP client with Bearer auth, 15s timeout, 429 retry (up to 3 attempts), and Jira error parsing into `APIError`. All API methods go through the private `do()` helper. `BuildJQL()` is shared between CLI and MCP.
+- **`cmd/mcp_resources.go`** — Read-only `jira://` resources and resource templates (priorities, project types and statuses, issue, its comments, worklogs and transitions, epic children). Handlers return `application/json`.
+- **`cmd/mcp_prompts.go`** — Reusable conversational prompts (`triage_issue`, `create_bug_report`, `epic_breakdown`, `summarise_comments`) that pre-load Jira context and produce structured `PromptMessage`s. No CLI counterpart (see paridad rules below).
+- **`internal/client/jira.go`** — Single HTTP client with Bearer or Basic auth, 15s timeout, 429 retry (up to 3 attempts), and Jira error parsing into `APIError`. All API methods go through the private `do()` helper. `BuildJQL()` is shared between CLI and MCP.
+- **`internal/markup/`** — Markdown ↔ Wiki Markup converters behind `--markdown` / `format=markdown`. `WikiToMarkdown` is line-based with a fence state machine; inline code, links, mentions and images are parked behind placeholders before the emphasis passes. Test against real PHO text when changing it: Jira content is far messier than the unit cases.
 - **`internal/config/`** — Viper-based config loading: flags > env vars > `~/.jira.yaml`.
 - **`internal/models/`** — Jira API request/response structs. `EditIssueRequest.Fields` is `map[string]any` for partial updates.
 

@@ -272,8 +272,9 @@ func splitTableRow(s string) []string {
 
 // WikiToMarkdown converts a Jira Server 8 Wiki Markup string into Markdown.
 // Empty input returns the empty string unchanged. The conversion is
-// best-effort: elements with no clean Markdown equivalent (anchors, color
-// macros, panels, {toc}, …) are left literal in the output.
+// best-effort: elements with no clean Markdown equivalent (emoticons, {toc},
+// +underline+, …) are left literal; {color}, {panel} and {anchor} tags are
+// dropped, keeping their text. The output never contains HTML.
 //
 // AI agent context: this is the inverse of MarkdownToWiki. Together they let a
 // caller live in Markdown end-to-end (publish in Markdown, read back in
@@ -283,41 +284,51 @@ func WikiToMarkdown(s string) string {
 		return ""
 	}
 
-	lines := strings.Split(s, "\n")
-	out := make([]string, 0, len(lines))
+	queue := strings.Split(s, "\n")
+	out := make([]string, 0, len(queue))
 
-	inFence := false
+	fence := "" // "code" or "noformat" while inside a block; the other tag is literal there
 	inQuote := false
 	inTable := false
 
-	for i := range lines {
-		line := lines[i]
+	for len(queue) > 0 {
+		line := queue[0]
+		queue = queue[1:]
 
-		if inFence {
-			if wikiCodeCloseRe.MatchString(line) {
-				inFence = false
+		// Jira lets block tags share a line with text ("$ ls {code}",
+		// "{code:java}x = 1;"). Split them off so each tag stands alone.
+		if parts := splitBlockTag(line, fence); parts != nil {
+			queue = append(parts, queue...)
+			continue
+		}
+
+		if fence != "" {
+			if m := wikiBlockLineRe.FindStringSubmatch(strings.TrimSpace(line)); m != nil && m[1] == fence {
+				fence = ""
 				out = append(out, "```")
 				continue
 			}
 			out = append(out, line)
 			continue
 		}
-		if m := wikiCodeOpenRe.FindStringSubmatch(line); m != nil {
-			inFence = true
-			out = append(out, "```"+m[1])
-			continue
+
+		if m := wikiBlockLineRe.FindStringSubmatch(strings.TrimSpace(line)); m != nil {
+			switch m[1] {
+			case "code", "noformat":
+				fence = m[1]
+				lang := ""
+				if m[1] == "code" {
+					lang = codeLang(m[2])
+				}
+				out = append(out, "```"+lang)
+			case "quote":
+				inQuote = !inQuote
+			}
+			continue // {panel} tags are dropped, their content stays
 		}
 
 		if inQuote {
-			if wikiQuoteCloseRe.MatchString(line) {
-				inQuote = false
-				continue
-			}
 			out = append(out, "> "+transformInlineWiki(line))
-			continue
-		}
-		if wikiQuoteOpenRe.MatchString(line) {
-			inQuote = true
 			continue
 		}
 
@@ -326,26 +337,24 @@ func WikiToMarkdown(s string) string {
 			for j, c := range cells {
 				cells[j] = transformInlineWiki(c)
 			}
-			out = append(out, "| "+strings.Join(cells, " | ")+" |")
-			seps := make([]string, len(cells))
-			for j := range seps {
-				seps[j] = "---"
-			}
-			out = append(out, "| "+strings.Join(seps, " | ")+" |")
+			out = append(out, "| "+strings.Join(cells, " | ")+" |", tableSeparator(len(cells)))
 			inTable = true
 			continue
 		}
-		if inTable && isWikiTableRow(line) {
+		if isWikiTableRow(line) {
 			cells := splitTableRow(line)
+			if !inTable {
+				// GFM needs a header row; Jira tables may have none.
+				out = append(out, "|"+strings.Repeat("  |", len(cells)), tableSeparator(len(cells)))
+				inTable = true
+			}
 			for j, c := range cells {
 				cells[j] = transformInlineWiki(c)
 			}
 			out = append(out, "| "+strings.Join(cells, " | ")+" |")
 			continue
 		}
-		if inTable {
-			inTable = false
-		}
+		inTable = false
 
 		if wikiHRRe.MatchString(line) {
 			out = append(out, "---")
@@ -386,42 +395,121 @@ func WikiToMarkdown(s string) string {
 	return strings.Join(out, "\n")
 }
 
+// splitBlockTag returns line split around its first block tag ({code},
+// {noformat}, {quote}, {panel}) when that tag shares the line with other text,
+// or nil when there is nothing to split. Inside a fence only the tag that
+// closes it counts. Tags that are part of {{inline code}} are ignored.
+func splitBlockTag(line, fence string) []string {
+	for _, loc := range wikiBlockTagRe.FindAllStringSubmatchIndex(line, -1) {
+		start, end := loc[0], loc[1]
+		if (start > 0 && line[start-1] == '{') || (end < len(line) && line[end] == '}') {
+			continue
+		}
+		if fence != "" && line[loc[2]:loc[3]] != fence {
+			continue
+		}
+		before := strings.TrimRight(line[:start], " \t")
+		after := strings.TrimLeft(line[end:], " \t")
+		if before == "" && after == "" {
+			return nil
+		}
+		var parts []string
+		if before != "" {
+			parts = append(parts, before)
+		}
+		parts = append(parts, line[start:end])
+		if after != "" {
+			parts = append(parts, after)
+		}
+		return parts
+	}
+	return nil
+}
+
+// codeLang extracts the language from {code} parameters: "java",
+// "title=Foo.java|java", "language=java". Unknown shapes yield "".
+func codeLang(params string) string {
+	for p := range strings.SplitSeq(params, "|") {
+		p = strings.TrimSpace(p)
+		if k, v, ok := strings.Cut(p, "="); ok {
+			if k == "language" || k == "lang" {
+				p = v
+			} else {
+				continue
+			}
+		}
+		if wikiLangRe.MatchString(p) {
+			return p
+		}
+	}
+	return ""
+}
+
+func tableSeparator(n int) string {
+	return "|" + strings.Repeat(" --- |", n)
+}
+
 var (
-	wikiCodeOpenRe     = regexp.MustCompile(`^\{code(?::([A-Za-z0-9_+\-]*))?\}\s*$`)
-	wikiCodeCloseRe    = regexp.MustCompile(`^\{code\}\s*$`)
-	wikiQuoteOpenRe    = regexp.MustCompile(`^\{quote\}\s*$`)
-	wikiQuoteCloseRe   = regexp.MustCompile(`^\{quote\}\s*$`)
+	wikiBlockTagRe     = regexp.MustCompile(`\{(code|noformat|quote|panel)(?::([^}]*))?\}`)
+	wikiBlockLineRe    = regexp.MustCompile(`^` + wikiBlockTagRe.String() + `$`)
+	wikiLangRe         = regexp.MustCompile(`^[A-Za-z0-9_+\-]+$`)
 	wikiHeadingRe      = regexp.MustCompile(`^h([1-6])\.\s+(.*)$`)
 	wikiBulletListRe   = regexp.MustCompile(`^(\*+)\s+(.*)$`)
 	wikiNumberedListRe = regexp.MustCompile(`^(#+)\s+(.*)$`)
 	wikiHRRe           = regexp.MustCompile(`^-{4,}\s*$`)
 
-	wikiInlineCodeRe = regexp.MustCompile(`\{\{([^}\n]+)\}\}`)
-	wikiBoldRe       = regexp.MustCompile(`(^|[^\w*])\*([^*\n]+)\*([^\w*]|$)`)
-	wikiItalicRe     = regexp.MustCompile(`(^|[^\w_])_([^_\n]+)_([^\w_]|$)`)
-	wikiStrikeRe     = regexp.MustCompile(`(^|[^\w-])-(\S[^-\n]*\S|\S)-([^\w-]|$)`)
-	wikiLinkRe       = regexp.MustCompile(`\[([^\]|\n]+)\|([^\]\n]+)\]`)
-	wikiImageRe      = regexp.MustCompile(`!([^!\s\n|]+)!`)
+	wikiBoldRe     = regexp.MustCompile(`(^|[^\w*])\*([^*\n]+)\*([^\w*]|$)`)
+	wikiItalicRe   = regexp.MustCompile(`(^|[^\w_])_([^_\n]+)_([^\w_]|$)`)
+	wikiStrikeRe   = regexp.MustCompile(`(^|[^\w-])-(\S[^-\n]*\S|\S)-([^\w-]|$)`)
+	wikiLinkRe     = regexp.MustCompile(`\[([^\]|\n]+)\|([^\]\n]+)\]`)
+	wikiImageRe    = regexp.MustCompile(`!([^!\s|]+)(?:\|[^!\n]*)?!`)
+	wikiMentionRe  = regexp.MustCompile(`\[~([^\]\s]+)\]`)
+	wikiBareURLRe  = regexp.MustCompile(`\[(https?://[^\]\s|]+)\]`)
+	wikiIssueRefRe = regexp.MustCompile(`\[([A-Z][A-Z0-9_]+-\d+)\]`)
+	wikiDroppedRe  = regexp.MustCompile(`\{(?:color(?::[^}]*)?|anchor(?::[^}]*)?)\}`)
 
 	wikiCodePlaceholderRe = regexp.MustCompile(`\x00W(\d+)\x00`)
 	wikiBoldPlaceholderRe = regexp.MustCompile(`\x00X(\d+)\x00`)
 )
 
 // transformInlineWiki applies inline conversions to a single Wiki line.
-// Inline code spans are extracted to placeholders first to avoid being
-// re-processed; bold spans are also placeholdered so the italic/strike passes
-// can use simple regexes without ambiguity.
+// Inline code, links, mentions and images are converted first and parked
+// behind placeholders, so the bold/italic/strike passes cannot touch their
+// content (an "_" in a URL or a "*" in code). Bold spans are placeholdered too
+// so the italic pass can use simple regexes without ambiguity.
 func transformInlineWiki(s string) string {
 	if s == "" {
 		return s
 	}
 
-	var codes []string
-	s = wikiInlineCodeRe.ReplaceAllStringFunc(s, func(m string) string {
-		inner := m[2 : len(m)-2]
-		idx := len(codes)
-		codes = append(codes, inner)
-		return fmt.Sprintf("\x00W%d\x00", idx)
+	var kept []string
+	keep := func(md string) string {
+		kept = append(kept, md)
+		return fmt.Sprintf("\x00W%d\x00", len(kept)-1)
+	}
+
+	s = replaceInlineCode(s, func(code string) string {
+		if strings.Contains(code, "`") {
+			return keep("`` " + code + " ``")
+		}
+		return keep("`" + code + "`")
+	})
+
+	s = wikiDroppedRe.ReplaceAllString(s, "")
+	s = wikiMentionRe.ReplaceAllStringFunc(s, func(m string) string {
+		return keep("@" + wikiMentionRe.FindStringSubmatch(m)[1])
+	})
+	s = wikiBareURLRe.ReplaceAllStringFunc(s, func(m string) string {
+		return keep("<" + wikiBareURLRe.FindStringSubmatch(m)[1] + ">")
+	})
+	s = wikiIssueRefRe.ReplaceAllString(s, "${1}")
+	s = wikiLinkRe.ReplaceAllStringFunc(s, func(m string) string {
+		sub := wikiLinkRe.FindStringSubmatch(m)
+		return keep("[" + sub[1] + "](" + sub[2] + ")")
+	})
+	s = wikiImageRe.ReplaceAllStringFunc(s, func(m string) string {
+		name := wikiImageRe.FindStringSubmatch(m)[1]
+		return keep("![" + name + "](" + name + ")")
 	})
 
 	var bolds []string
@@ -434,23 +522,58 @@ func transformInlineWiki(s string) string {
 
 	s = wikiItalicRe.ReplaceAllString(s, "${1}*${2}*${3}")
 	s = wikiStrikeRe.ReplaceAllString(s, "${1}~~${2}~~${3}")
-	s = wikiLinkRe.ReplaceAllString(s, "[${1}](${2})")
-	s = wikiImageRe.ReplaceAllString(s, "![${1}](${1})")
 
 	s = wikiBoldPlaceholderRe.ReplaceAllStringFunc(s, func(m string) string {
 		var idx int
 		_, _ = fmt.Sscanf(m, "\x00X%d\x00", &idx)
 		return "**" + bolds[idx] + "**"
 	})
-	s = wikiCodePlaceholderRe.ReplaceAllStringFunc(s, func(m string) string {
-		var idx int
-		_, _ = fmt.Sscanf(m, "\x00W%d\x00", &idx)
-		return "`" + codes[idx] + "`"
-	})
+	// Kept spans can nest (code inside link text), hence the loop.
+	for wikiCodePlaceholderRe.MatchString(s) {
+		s = wikiCodePlaceholderRe.ReplaceAllStringFunc(s, func(m string) string {
+			var idx int
+			_, _ = fmt.Sscanf(m, "\x00W%d\x00", &idx)
+			return kept[idx]
+		})
+	}
 
 	return s
 }
 
+// replaceInlineCode replaces each {{code}} span with fn(code). A span ends at
+// the first "}}", so {{GET /devices/{id}/x}} keeps its inner braces; an
+// unclosed "{{" followed by a later one restarts at the later one, so a typo
+// does not swallow the text up to the next span.
+func replaceInlineCode(s string, fn func(string) string) string {
+	var b strings.Builder
+	for {
+		open := strings.Index(s, "{{")
+		if open < 0 {
+			break
+		}
+		closing := strings.Index(s[open+2:], "}}")
+		if closing < 0 {
+			break
+		}
+		closing += open + 2
+		if next := strings.Index(s[open+2:closing], "{{"); next >= 0 {
+			cut := open + 2 + next
+			b.WriteString(s[:cut])
+			s = s[cut:]
+			continue
+		}
+		if closing == open+2 { // "{{}}" is not a span
+			b.WriteString(s[:closing+2])
+			s = s[closing+2:]
+			continue
+		}
+		b.WriteString(s[:open])
+		b.WriteString(fn(s[open+2 : closing]))
+		s = s[closing+2:]
+	}
+	b.WriteString(s)
+	return b.String()
+}
 func isWikiTableHeader(s string) bool {
 	t := strings.TrimSpace(s)
 	return strings.HasPrefix(t, "||") && strings.HasSuffix(t, "||") && len(t) >= 4

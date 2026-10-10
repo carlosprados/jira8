@@ -65,7 +65,7 @@ project: MYPROJ
 
 ### Configuration priority (highest to lowest)
 
-1. CLI flags (`--url`, `--token`, `--project`)
+1. CLI flags (`--url`, `--token`, `--project`; `--config` picks another file)
 2. Environment variables
 3. `~/.jira.yaml`
 
@@ -82,9 +82,9 @@ project: MYPROJ
 You can override the default project per-command or per-session:
 
 ```bash
-./jira8 issue list --project OTHER                # per-command
-JIRA_PROJECT=OTHER ./jira8 issue list             # per-command via env
-export JIRA_PROJECT=OTHER && ./jira8 issue list   # per-session
+jira8 issue list --project OTHER                  # per-command
+JIRA_PROJECT=OTHER jira8 issue list               # per-command via env
+export JIRA_PROJECT=OTHER && jira8 issue list     # per-session
 ```
 
 ## Usage
@@ -120,7 +120,11 @@ jira8 issue create --summary "Fix login bug" --type Bug
 jira8 issue create --summary "New feature" --type Story --description "Details..." --assignee me --priority High
 jira8 issue create --summary "Ingest worker" --type Story --epic-link MYPROJ-42   # link to Epic
 jira8 issue create --summary "Q2 Refactor" --type Epic --epic-name "Q2 Refactor"  # Epic
+jira8 issue create --summary "Write tests" --type Sub-task --parent MYPROJ-123    # Sub-task
 ```
+
+Long descriptions and bodies can come from a file or stdin, and from Markdown;
+see [Markdown and Wiki Markup](#markdown-and-wiki-markup).
 
 ### Edit issue
 
@@ -215,6 +219,8 @@ types like `Relates` the order is irrelevant. `--type` defaults to `Relates`.
 ```bash
 jira8 issue comment-list MYPROJ-123                          # list comments
 jira8 issue comment-add MYPROJ-123 --body "Looks good"       # add a comment
+jira8 issue comment-edit MYPROJ-123 --id 84887 --body "Fixed typo"
+jira8 issue comment-delete MYPROJ-123 --id 84887             # asks for confirmation; --yes skips it
 ```
 
 ### Worklogs
@@ -223,6 +229,7 @@ jira8 issue comment-add MYPROJ-123 --body "Looks good"       # add a comment
 jira8 issue worklog-list MYPROJ-123                                  # list worklogs
 jira8 issue worklog-add MYPROJ-123 --time 2h --comment "Investig."   # add a worklog
 jira8 issue worklog-add MYPROJ-123 --time 30m --date 2026-04-15T09:00:00.000+0200
+jira8 issue worklog-delete MYPROJ-123 --id 27705             # asks for confirmation; --yes skips it
 ```
 
 ### Attachments
@@ -235,7 +242,7 @@ jira8 issue attachment delete 45821                            # delete by attac
 # Or attach at create/edit time:
 jira8 issue create --summary "Crash on login" --type Bug \
     --attach screenshot.png --attach trace.log
-jira8 issue edit MYPROJ-123 --attach extra-evidence.pdf        # adjuntar sin tocar otros campos
+jira8 issue edit MYPROJ-123 --attach extra-evidence.pdf        # attach without touching other fields
 ```
 
 Uploads stream from disk so large files do not get buffered in memory. The
@@ -259,6 +266,44 @@ jira8 project types --project OTHER         # for a different project
 
 All commands support `--output json` (or `-o json`) for machine-readable output.
 
+### Markdown and Wiki Markup
+
+Jira Server 8 stores descriptions, comments and worklog comments as Wiki Markup.
+jira8 converts in both directions so you can work in Markdown:
+
+```bash
+# Write: Markdown in, Wiki Markup sent to Jira
+jira8 issue create --summary "Spike" --type Task --markdown --description-file spike.md
+jira8 issue comment-add MYPROJ-123 --markdown --body "**Done**, see \`make test\`"
+generate-report | jira8 issue comment-add MYPROJ-123 --markdown --body-file -   # from stdin
+
+# Read: Wiki Markup from Jira, Markdown out
+jira8 issue view MYPROJ-123 --markdown -o json
+jira8 issue comment-list MYPROJ-123 --markdown
+```
+
+`--description-file`, `--body-file` and `--comment-file` read the text from a
+file, or from stdin with `-`. On the MCP side the same switch is the `format`
+parameter (`"wiki"` by default, or `"markdown"`): on write tools it converts
+the input, on read tools the output.
+
+Reading produces GitHub-flavoured Markdown and never HTML. What converts:
+
+| Wiki Markup | Markdown |
+|-------------|----------|
+| `h1.` … `h6.` | `#` … `######` |
+| `*bold*`, `_italic_`, `-strike-`, `{{code}}` | `**bold**`, `*italic*`, `~~strike~~`, `` `code` `` |
+| `{code:lang}` / `{noformat}` blocks, also when the tag shares a line with text | fenced blocks, content untouched |
+| `{quote}`, `bq.` | `>` |
+| `*` / `#` lists, nested | `-` / `1.` lists, two spaces per level |
+| `\|\|head\|\|` tables, also without a header row | GFM tables (an empty header is added when missing) |
+| `[text\|url]`, `[url]`, `[MYPROJ-1]`, `[~user]` | `[text](url)`, `<url>`, `MYPROJ-1`, `@user` |
+| `!image.png!`, `!image.png\|thumbnail!` | `![image.png](image.png)` (attachment name, not a URL) |
+| `{color}`, `{panel}`, `{anchor}` | removed, their text kept |
+
+Emoticons, `+underline+`, `^sup^`, `~sub~`, `{toc}` and other macros stay
+literal. History values (`--with-history`) are never converted.
+
 ## MCP Server
 
 Start as an MCP server (stdio transport) for AI agent integration:
@@ -278,6 +323,8 @@ jira8 mcp serve
 | `jira_transition_issue` | Transition an issue |
 | `jira_list_transitions` | List available transitions |
 | `jira_rank_issue` | Reorder issues in a board column (`top`, `bottom`, `before`, `after`) |
+| `jira_link_issues` | Link two issues (`Relates`, `Blocks`, …) with an optional comment |
+| `jira_list_link_types` | List the available issue link types |
 | `jira_add_comment` | Add a comment |
 | `jira_list_comments` | List comments |
 | `jira_edit_comment` | Edit an existing comment |
