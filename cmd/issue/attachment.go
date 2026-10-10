@@ -10,8 +10,6 @@ import (
 
 // attachmentCmd is the parent for attachment subcommands.
 // Mirrors the Jira REST surface: upload (POST), list (GET issue), delete (DELETE by id).
-// The matching MCP tools are jira_add_attachment, jira_list_attachments,
-// jira_delete_attachment — same shape, same arguments.
 var attachmentCmd = &cobra.Command{
 	Use:     "attachment",
 	Aliases: []string{"att"},

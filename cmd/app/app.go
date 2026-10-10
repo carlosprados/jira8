@@ -35,7 +35,7 @@ func Get() *State {
 
 // EpicFieldIDs returns the Jira customfield_XXXXX IDs for Epic Name and Epic Link.
 // The lookup is performed once per process via /rest/api/2/field and cached.
-// Used by create/edit/view commands and MCP tools that touch Epic fields.
+// Used by create/edit/view commands that touch Epic fields.
 func (s *State) EpicFieldIDs(ctx context.Context) (epicNameID, epicLinkID string, err error) {
 	s.epicOnce.Do(func() {
 		s.epicNameID, s.epicLinkID, s.epicResolveErr = s.Client.ResolveEpicFields(ctx)

@@ -55,8 +55,7 @@ func RenderWorklogsAsMarkdown(worklogs []models.Worklog) {
 	}
 }
 
-// HistoryValueMax is the rune budget for a history value in terminal and MCP
-// output. Long-text fields (description, environment) store the whole text on
+// HistoryValueMax is the rune budget for a history value in terminal output. Long-text fields (description, environment) store the whole text on
 // every edit: PHO-2466 carries 787 KB of description history in 4 entries.
 const HistoryValueMax = 200
 

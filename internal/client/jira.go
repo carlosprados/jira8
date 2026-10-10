@@ -400,8 +400,6 @@ func (c *Client) GetComments(ctx context.Context, key string) ([]models.Comment,
 // AddAttachments uploads one or more files to an issue.
 // Files are streamed via multipart/form-data; the call requires
 // X-Atlassian-Token: no-check (Jira XSRF protection).
-// Paths are resolved on the host running this process — when invoked through
-// the MCP server, that means the server host, not the AI agent's client.
 func (c *Client) AddAttachments(ctx context.Context, key string, files []string) ([]models.Attachment, error) {
 	if len(files) == 0 {
 		return nil, fmt.Errorf("no files to upload")
@@ -455,7 +453,6 @@ func (c *Client) GetMyself(ctx context.Context) (*models.User, error) {
 // ResolveAssignee maps the "me" alias (case-insensitive) to the authenticated
 // user's username via GetMyself; any other value is returned unchanged. Callers
 // are responsible for the empty-string case (skip the field, or clear it).
-// Shared by the CLI create/edit commands and the equivalent MCP tools.
 func (c *Client) ResolveAssignee(ctx context.Context, assignee string) (string, error) {
 	if !strings.EqualFold(assignee, "me") {
 		return assignee, nil
