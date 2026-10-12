@@ -25,12 +25,12 @@ is coloured and may change. Every Jira command honours `-o json`, writes include
 
 | Command | JSON |
 |---|---|
-| `issue list`, `epic list`, `epic children` | array of issues (`key`, `fields.*`) |
+| `issue list`, `epic list`, `epic children` | array of issues (`key`, `url`, `fields.*`) |
 | `issue view` | one issue; `fields.comment.comments[]`, `changelog` with `--with-history` |
 | `comment-list`, `worklog-list`, `attachment list` | array (`id`, `body` / `timeSpent`, `started`, `comment` / `filename`) |
-| `issue create`, `epic create` | `{id, key, self}` (+ `attachments[]`) |
+| `issue create`, `epic create` | `{id, key, self, url}` (+ `attachments[]`) |
 | `comment-add`, `comment-edit`, `worklog-add`, `attachment add` | the created object(s), with their `id` |
-| `issue edit`, `epic edit` | `{key, updated: [field ids]}` (+ `attachments[]`) |
+| `issue edit`, `epic edit` | `{key, url, updated: [field ids]}` (+ `attachments[]`) |
 | `transition` | `{key, transition, status}` (+ `updated`, `comment` id, `attachments[]`) |
 | `link` | `{outward, type, inward}` |
 | `issue links` | array of `{id, type, direction, phrase, key, summary, status}`, seen from that issue |
@@ -39,9 +39,12 @@ is coloured and may change. Every Jira command honours `-o json`, writes include
 | `*-delete`, `attachment delete` | `{…, id, deleted: true}` |
 | any write with `--dry-run` | `{dry_run: true, requests: [{method, path, body?, files?}]}` |
 | `markup md2wiki`, `markup wiki2md` | `{wiki}` / `{markdown}` |
+| `open` | `{key, url}` (does not launch a browser) |
 
 Issues are the Jira REST payload, so field names follow the Jira API
-(`fields.status.name`, `fields.assignee.name`…). Chain steps with `jq`:
+(`fields.status.name`, `fields.assignee.name`…), plus `url`: the issue in the
+browser, the link to give the user (`self` is the API address).
+`jira8 open ABC-123` opens it in the user's browser. Chain steps with `jq`:
 
 ```sh
 KEY=$(jira8 issue create --project ABC --type Task --summary "…" -o json | jq -r .key)
@@ -269,8 +272,19 @@ Say so instead of improvising with the REST API:
 
 ## Errors
 
-Errors go to stderr as one line and exit 1. Only a wrong flag or argument also
-prints the command usage.
+Errors go to stderr as one line. Only a wrong flag or argument also prints the
+command usage. The exit code tells what failed:
+
+| Exit | Meaning | What to do |
+|---|---|---|
+| 0 | done (also a `--dry-run`) | |
+| 1 | jira8 refused before sending: unknown name, missing required field, no project, config, file | read the message, fix the input |
+| 2 | usage: unknown command or flag, wrong arguments | check `--help` |
+| 3 | Jira said 401/403: credentials or permission | tell the user |
+| 4 | Jira said 404 | check the key or id; it may be invisible to the user |
+| 5 | Jira rejected the request (400, 409, other 4xx) | read the message below |
+| 6 | Jira failed (5xx) or kept rate-limiting | retry later |
+| 7 | Jira was not reached (network, VPN, timeout) | tell the user; do not loop |
 
 - `Jira API error (HTTP n): message; field: message`:
   - `400` naming a value (`Priority name 'High' is not valid`): check

@@ -89,7 +89,7 @@ func runEdit(cmd *cobra.Command, args []string) error {
 	if err := a.Client.EditIssue(context.Background(), key, req); err != nil {
 		return err
 	}
-	out := map[string]any{"key": key, "updated": app.UpdatedFields(fields, update)}
+	out := map[string]any{"key": key, "url": a.Client.BrowseURL(key), "updated": app.UpdatedFields(fields, update)}
 	if len(uploaded) > 0 {
 		out["attachments"] = uploaded
 	}

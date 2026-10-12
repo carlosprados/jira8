@@ -86,7 +86,7 @@ func (c *Client) doMultipartUpload(ctx context.Context, path string, files []str
 
 	resp, err := c.uploadClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("cannot reach Jira (check the network or VPN): %w", err)
+		return nil, fmt.Errorf("%w (check the network or VPN): %w", ErrUnreachable, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 

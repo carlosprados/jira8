@@ -138,7 +138,7 @@ func runCreate(cmd *cobra.Command, args []string) error {
 		return app.OutputJSON(payload)
 	}
 
-	fmt.Printf("Created %s\n", resp.Key)
+	fmt.Printf("Created %s  %s\n", resp.Key, resp.URL)
 	if len(uploaded) > 0 {
 		fmt.Printf("Uploaded %d attachment(s):\n", len(uploaded))
 		for _, att := range uploaded {

@@ -320,6 +320,25 @@ jira8 user me                             # the authenticated user
 ### Output format
 
 All commands support `--output json` (or `-o json`) for machine-readable output.
+Issues and the answers of create/edit carry `url`, the issue in the browser.
+
+```bash
+jira8 open MYPROJ-123            # open it in the browser (prints the URL without a display)
+jira8 open MYPROJ-123 -o json    # {key, url}, no browser
+```
+
+### Exit codes
+
+| Code | Meaning |
+|---|---|
+| 0 | success (also a `--dry-run`) |
+| 1 | refused by jira8 before sending: unknown name, missing required field, no project, config, file |
+| 2 | usage: unknown command or flag, wrong arguments |
+| 3 | authentication or permission (401, 403) |
+| 4 | not found (404) |
+| 5 | rejected by Jira (400, 409, other 4xx) |
+| 6 | Jira server error (5xx) or rate limit after the retries |
+| 7 | Jira not reachable (network, VPN, timeout) |
 
 ### Dry run
 

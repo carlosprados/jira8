@@ -100,7 +100,7 @@ func runCreate(cmd *cobra.Command, args []string) error {
 		}{resp, uploaded})
 	}
 
-	fmt.Printf("Created Epic %s\n", resp.Key)
+	fmt.Printf("Created Epic %s  %s\n", resp.Key, resp.URL)
 	app.PrintUploadedImages(uploaded)
 	return nil
 }

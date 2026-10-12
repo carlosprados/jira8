@@ -148,9 +148,10 @@ func runEdit(cmd *cobra.Command, args []string) error {
 	if a.Output == "json" {
 		return app.OutputJSON(struct {
 			Key         string              `json:"key"`
+			URL         string              `json:"url"`
 			Updated     []string            `json:"updated"`
 			Attachments []models.Attachment `json:"attachments,omitempty"`
-		}{key, app.UpdatedFields(fields, update), uploaded})
+		}{key, a.Client.BrowseURL(key), app.UpdatedFields(fields, update), uploaded})
 	}
 	if len(fields) > 0 || len(update) > 0 {
 		fmt.Printf("Updated %s\n", key)

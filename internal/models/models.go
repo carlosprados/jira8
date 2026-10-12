@@ -19,6 +19,8 @@ type Issue struct {
 	Key    string      `json:"key"`
 	Self   string      `json:"self"`
 	Fields IssueFields `json:"fields"`
+	// URL is the issue in the browser ({base}/browse/{key}), set by the client.
+	URL string `json:"url,omitempty"`
 	// Changelog is only filled when requested (GET /issue/{key}?expand=changelog):
 	// who changed which field, from what to what, oldest first.
 	Changelog *Changelog `json:"changelog,omitempty"`
@@ -403,6 +405,7 @@ type CreateIssueResponse struct {
 	ID   string `json:"id"`
 	Key  string `json:"key"`
 	Self string `json:"self"`
+	URL  string `json:"url,omitempty"`
 }
 
 // IssueTypeWithStatuses is a single issue type with its available statuses,
