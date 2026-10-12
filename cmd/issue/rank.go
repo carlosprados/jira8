@@ -20,10 +20,10 @@ var rankCmd = &cobra.Command{
 		"the first or last position of that column. When the project has more than one " +
 		"board, pass --board with an ID or name (the error lists the candidates).\n\n" +
 		"Several keys can be ranked at once (up to 50); they keep their relative order.",
-	Example: "  jira8 issue rank PHO-5050 --top\n" +
-		"  jira8 issue rank PHO-5050 --bottom --board \"Phoenix Kanban\"\n" +
-		"  jira8 issue rank PHO-5050 --before PHO-4941\n" +
-		"  jira8 issue rank PHO-5050 PHO-5021 --top --board 110",
+	Example: "  jira8 issue rank ABC-123 --top\n" +
+		"  jira8 issue rank ABC-123 --bottom --board \"Team Kanban\"\n" +
+		"  jira8 issue rank ABC-123 --before ABC-99\n" +
+		"  jira8 issue rank ABC-123 ABC-124 --top --board 42",
 	Args: cobra.MinimumNArgs(1),
 	RunE: runRank,
 }

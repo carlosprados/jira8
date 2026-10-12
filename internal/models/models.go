@@ -135,8 +135,9 @@ type Status struct {
 
 // IssueType represents a Jira issue type.
 type IssueType struct {
-	Name string `json:"name"`
-	ID   string `json:"id"`
+	Name    string `json:"name"`
+	ID      string `json:"id"`
+	Subtask bool   `json:"subtask"`
 }
 
 // Priority represents a Jira issue priority.
@@ -342,7 +343,7 @@ type IssueLinkComment struct {
 
 // IssueLinkRequest is the POST body for /rest/api/2/issueLink. The outward
 // issue is the subject of the relationship ("OUTWARD <outward-phrase> INWARD",
-// e.g. "ESA-207 blocks ESA-214"). For symmetric types like "Relates" the
+// e.g. "ABC-207 blocks ABC-214"). For symmetric types like "Relates" the
 // direction is irrelevant.
 type IssueLinkRequest struct {
 	Type         IssueLinkTypeRef  `json:"type"`

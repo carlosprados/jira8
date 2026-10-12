@@ -15,9 +15,11 @@ package markup
 
 import (
 	"fmt"
+	"html"
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode"
 )
 
 // MarkdownToWiki converts a Markdown string into Jira Server 8 Wiki Markup.
@@ -32,6 +34,7 @@ func MarkdownToWiki(s string) string {
 
 	inFence := false
 	inTable := false
+	var listKinds []byte // marker per nesting level, so "1." > "-" becomes "#*"
 
 	for i := 0; i < len(lines); i++ {
 		line := lines[i]
@@ -99,20 +102,35 @@ func MarkdownToWiki(s string) string {
 		}
 
 		if m := bulletListRe.FindStringSubmatch(line); m != nil {
-			depth := indentDepth(m[1])
-			out = append(out, strings.Repeat("*", depth)+" "+transformInline(m[2]))
+			listKinds = nestList(listKinds, indentDepth(m[1]), '*')
+			out = append(out, string(listKinds)+" "+transformInline(m[2]))
 			continue
 		}
 		if m := orderedListRe.FindStringSubmatch(line); m != nil {
-			depth := indentDepth(m[1])
-			out = append(out, strings.Repeat("#", depth)+" "+transformInline(m[2]))
+			listKinds = nestList(listKinds, indentDepth(m[1]), '#')
+			out = append(out, string(listKinds)+" "+transformInline(m[2]))
 			continue
+		}
+		if strings.TrimSpace(line) != "" {
+			listKinds = nil
 		}
 
 		out = append(out, transformInline(line))
 	}
 
 	return strings.Join(out, "\n")
+}
+
+// nestList returns the Wiki list prefix for an item at depth, keeping the
+// markers of its ancestors.
+func nestList(kinds []byte, depth int, kind byte) []byte {
+	if len(kinds) >= depth {
+		kinds = kinds[:depth-1]
+	}
+	for len(kinds) < depth-1 {
+		kinds = append(kinds, kind)
+	}
+	return append(kinds, kind)
 }
 
 // indentDepth maps a leading-whitespace string to a 1-based list depth.
@@ -145,9 +163,11 @@ var (
 	italicUnderRe = regexp.MustCompile(`(^|\W)_([^_\n]+)_(\W|$)`)
 	strikeRe      = regexp.MustCompile(`~~([^~\n]+)~~`)
 	linkRe        = regexp.MustCompile(`\[([^\]]+)\]\(([^)\s]+)\)`)
+	mentionRe     = regexp.MustCompile(`\[~[^\]\s]+\]`)
 
 	codePlaceholderRe = regexp.MustCompile(`\x00C(\d+)\x00`)
 	boldPlaceholderRe = regexp.MustCompile(`\x00B(\d+)\x00`)
+	linkPlaceholderRe = regexp.MustCompile(`\x00L(\d+)\x00`)
 )
 
 // transformInline applies inline conversions to a single line of text. Inline
@@ -167,6 +187,16 @@ func transformInline(s string) string {
 		return fmt.Sprintf("\x00C%d\x00", idx)
 	})
 
+	// Links and mentions are parked so the escaping below cannot touch them.
+	var links []string
+	park := func(m string) string {
+		links = append(links, m)
+		return fmt.Sprintf("\x00L%d\x00", len(links)-1)
+	}
+	s = linkRe.ReplaceAllStringFunc(s, park)
+	s = mentionRe.ReplaceAllStringFunc(s, park)
+	s = escapeBrackets(s)
+
 	var bolds []string
 	stash := func(m string, marker int) string {
 		inner := m[marker : len(m)-marker]
@@ -181,7 +211,11 @@ func transformInline(s string) string {
 	s = italicUnderRe.ReplaceAllString(s, "${1}_${2}_${3}")
 
 	s = strikeRe.ReplaceAllString(s, "-${1}-")
-	s = linkRe.ReplaceAllString(s, "[${1}|${2}]")
+	s = linkPlaceholderRe.ReplaceAllStringFunc(s, func(m string) string {
+		var idx int
+		_, _ = fmt.Sscanf(m, "\x00L%d\x00", &idx)
+		return linkRe.ReplaceAllString(links[idx], "[${1}|${2}]")
+	})
 
 	s = boldPlaceholderRe.ReplaceAllStringFunc(s, func(m string) string {
 		var idx int
@@ -191,10 +225,71 @@ func transformInline(s string) string {
 	s = codePlaceholderRe.ReplaceAllStringFunc(s, func(m string) string {
 		var idx int
 		_, _ = fmt.Sscanf(m, "\x00C%d\x00", &idx)
-		return "{{" + codes[idx] + "}}"
+		return "{{" + wikiCode(codes[idx]) + "}}"
 	})
 
 	return s
+}
+
+// closesEffect reports whether rs holds a closing marker as Jira sees it:
+// after a non-space and before the end or a non-alphanumeric rune. rs starts
+// right after the opening marker.
+func closesEffect(rs []rune, marker rune) bool {
+	for j := 1; j < len(rs); j++ {
+		if rs[j] != marker || unicode.IsSpace(rs[j-1]) {
+			continue
+		}
+		if j+1 == len(rs) || !unicode.IsLetter(rs[j+1]) && !unicode.IsDigit(rs[j+1]) {
+			return true
+		}
+	}
+	return false
+}
+
+// escapeBrackets backslash-escapes braces and brackets in prose: to Jira a
+// bare {x} is a macro and [x] a link. Already escaped ones are left alone.
+func escapeBrackets(s string) string {
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c == '\\' && i+1 < len(s) {
+			b.WriteByte(c)
+			b.WriteByte(s[i+1])
+			i++
+			continue
+		}
+		if strings.IndexByte("{}[]", c) >= 0 {
+			b.WriteByte('\\')
+		}
+		b.WriteByte(c)
+	}
+	return b.String()
+}
+
+// wikiCode makes text safe inside {{...}}: Jira still parses braces, brackets
+// and effect markers there ({{a -b- c}} renders b struck through). Those become
+// numeric entities, which Jira renders literally. A marker is escaped only
+// when it opens an effect that also closes, so "ls -la" and "--flag" stay
+// readable.
+func wikiCode(code string) string {
+	var b strings.Builder
+	rs := []rune(code)
+	for i, r := range rs {
+		switch r {
+		case '{', '}', '[', ']':
+			fmt.Fprintf(&b, "&#%d;", r)
+			continue
+		case '-', '+', '^', '~', '*', '_', '?':
+			opens := (i == 0 || unicode.IsSpace(rs[i-1])) &&
+				i+1 < len(rs) && !unicode.IsSpace(rs[i+1]) && rs[i+1] != r
+			if opens && closesEffect(rs[i+1:], r) {
+				fmt.Fprintf(&b, "&#%d;", r)
+				continue
+			}
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
 }
 
 // isHorizontalRule reports whether the line is a Markdown thematic break:
@@ -376,16 +471,22 @@ func WikiToMarkdown(s string) string {
 			continue
 		}
 
-		if m := wikiBulletListRe.FindStringSubmatch(line); m != nil {
-			depth := len(m[1])
-			indent := strings.Repeat("  ", depth-1)
-			out = append(out, indent+"- "+transformInlineWiki(m[2]))
-			continue
-		}
-		if m := wikiNumberedListRe.FindStringSubmatch(line); m != nil {
-			depth := len(m[1])
-			indent := strings.Repeat("  ", depth-1)
-			out = append(out, indent+"1. "+transformInlineWiki(m[2]))
+		if m := wikiListRe.FindStringSubmatch(line); m != nil {
+			// Markdown nests under the parent's content column: 2 spaces
+			// below "- ", 3 below "1. ".
+			var indent strings.Builder
+			for _, k := range m[1][:len(m[1])-1] {
+				if k == '#' {
+					indent.WriteString("   ")
+				} else {
+					indent.WriteString("  ")
+				}
+			}
+			marker := "- "
+			if m[1][len(m[1])-1] == '#' {
+				marker = "1. "
+			}
+			out = append(out, indent.String()+marker+transformInlineWiki(m[2]))
 			continue
 		}
 
@@ -450,13 +551,12 @@ func tableSeparator(n int) string {
 }
 
 var (
-	wikiBlockTagRe     = regexp.MustCompile(`\{(code|noformat|quote|panel)(?::([^}]*))?\}`)
-	wikiBlockLineRe    = regexp.MustCompile(`^` + wikiBlockTagRe.String() + `$`)
-	wikiLangRe         = regexp.MustCompile(`^[A-Za-z0-9_+\-]+$`)
-	wikiHeadingRe      = regexp.MustCompile(`^h([1-6])\.\s+(.*)$`)
-	wikiBulletListRe   = regexp.MustCompile(`^(\*+)\s+(.*)$`)
-	wikiNumberedListRe = regexp.MustCompile(`^(#+)\s+(.*)$`)
-	wikiHRRe           = regexp.MustCompile(`^-{4,}\s*$`)
+	wikiBlockTagRe  = regexp.MustCompile(`\{(code|noformat|quote|panel)(?::([^}]*))?\}`)
+	wikiBlockLineRe = regexp.MustCompile(`^` + wikiBlockTagRe.String() + `$`)
+	wikiLangRe      = regexp.MustCompile(`^[A-Za-z0-9_+\-]+$`)
+	wikiHeadingRe   = regexp.MustCompile(`^h([1-6])\.\s+(.*)$`)
+	wikiListRe      = regexp.MustCompile(`^([*#]+)\s+(\S.*)$`)
+	wikiHRRe        = regexp.MustCompile(`^-{4,}\s*$`)
 
 	wikiBoldRe     = regexp.MustCompile(`(^|[^\w*])\*([^*\n]+)\*([^\w*]|$)`)
 	wikiItalicRe   = regexp.MustCompile(`(^|[^\w_])_([^_\n]+)_([^\w_]|$)`)
@@ -489,6 +589,7 @@ func transformInlineWiki(s string) string {
 	}
 
 	s = replaceInlineCode(s, func(code string) string {
+		code = html.UnescapeString(code)
 		if strings.Contains(code, "`") {
 			return keep("`` " + code + " ``")
 		}

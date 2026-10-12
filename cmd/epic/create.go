@@ -36,9 +36,9 @@ func runCreate(cmd *cobra.Command, args []string) error {
 
 	name, _ := cmd.Flags().GetString("name")
 	summary, _ := cmd.Flags().GetString("summary")
-	project, _ := cmd.Flags().GetString("project")
-	if project == "" {
-		project = a.Config.Project
+	project, err := app.ProjectKey(cmd)
+	if err != nil {
+		return err
 	}
 	description, _, err := app.ReadTextInput(cmd, "description", "description-file")
 	if err != nil {

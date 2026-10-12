@@ -25,7 +25,14 @@ var (
 var rootCmd = &cobra.Command{
 	Use:   "jira8",
 	Short: "CLI for Jira Server 8",
-	Long:  "A command-line interface for interacting with Jira Server 8 REST API.",
+	Long: `A command-line interface for Jira Server / Data Center 8 (REST API v2).
+
+Configuration: ~/.jira.yaml (or --config) with 'url' plus 'token' (Bearer) or
+'user' + 'password' (Basic), and optionally a default 'project'. The same keys
+work as JIRA_URL, JIRA_TOKEN, JIRA_USER, JIRA_PASSWORD and JIRA_PROJECT.
+
+Use -o json to read the output from a script. Coding agents: run
+'jira8 skill install' (or read 'jira8 skill show') before using this CLI.`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// Flags and args are already validated here, so from now on an error
 		// is a runtime one (config, Jira API): print it without the usage.

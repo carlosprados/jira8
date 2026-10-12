@@ -19,7 +19,7 @@ var attachmentCmd = &cobra.Command{
 var attachmentAddCmd = &cobra.Command{
 	Use:     "add ISSUE-KEY FILE [FILE...]",
 	Short:   "Upload one or more files to an issue",
-	Example: "  jira8 issue attachment add ESA-123 diag.png trace.log",
+	Example: "  jira8 issue attachment add ABC-123 diag.png trace.log",
 	Args:    cobra.MinimumNArgs(2),
 	RunE:    runAttachmentAdd,
 }
@@ -28,7 +28,7 @@ var attachmentListCmd = &cobra.Command{
 	Use:     "list ISSUE-KEY",
 	Aliases: []string{"ls"},
 	Short:   "List attachments on an issue",
-	Example: "  jira8 issue attachment list ESA-123",
+	Example: "  jira8 issue attachment list ABC-123",
 	Args:    cobra.ExactArgs(1),
 	RunE:    runAttachmentList,
 }
@@ -37,12 +37,13 @@ var attachmentDeleteCmd = &cobra.Command{
 	Use:     "delete ATTACHMENT-ID",
 	Aliases: []string{"rm"},
 	Short:   "Delete an attachment by ID",
-	Example: "  jira8 issue attachment delete 45821",
+	Example: "  jira8 issue attachment delete 45821\n  jira8 issue attachment delete 45821 --yes",
 	Args:    cobra.ExactArgs(1),
 	RunE:    runAttachmentDelete,
 }
 
 func init() {
+	attachmentDeleteCmd.Flags().Bool("yes", false, "Skip confirmation prompt")
 	attachmentCmd.AddCommand(attachmentAddCmd)
 	attachmentCmd.AddCommand(attachmentListCmd)
 	attachmentCmd.AddCommand(attachmentDeleteCmd)
@@ -108,10 +109,14 @@ func runAttachmentDelete(cmd *cobra.Command, args []string) error {
 	a := app.Get()
 	id := args[0]
 
+	yes, _ := cmd.Flags().GetBool("yes")
+	if ok, err := app.Confirm(fmt.Sprintf("Delete attachment %s?", id), yes); !ok {
+		return err
+	}
+
 	if err := a.Client.DeleteAttachment(context.Background(), id); err != nil {
 		return err
 	}
 
-	fmt.Printf("Deleted attachment %s\n", id)
-	return nil
+	return app.Done(map[string]any{"id": id, "deleted": true}, "Deleted attachment %s", id)
 }

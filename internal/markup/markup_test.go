@@ -322,3 +322,66 @@ func TestRoundTrip(t *testing.T) {
 		})
 	}
 }
+
+// Cases checked against Jira 8's own wiki renderer (/rest/api/1.0/render).
+func TestMarkdownToWikiJiraSafety(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"braces in code become entities", "`map[string]any{\"a\": 1}`", "{{map&#91;string&#93;any&#123;\"a\": 1&#125;}}"},
+		{"template braces in code", "`{{template}}`", "{{&#123;&#123;template&#125;&#125;}}"},
+		{"effect marker in code is escaped", "`see -this- now`", "{{see &#45;this- now}}"},
+		{"flags in code stay readable", "`ls -la --with-history`", "{{ls -la --with-history}}"},
+		{"identifiers in code stay readable", "`a-b-c x_y`", "{{a-b-c x_y}}"},
+		{"shortest effect in code", "`-a-`", "{{&#45;a-}}"},
+		{"effect before punctuation", "`x *a b*.`", "{{x &#42;a b*.}}"},
+		{"no closer, no escape", "`x -a b-c`", "{{x -a b-c}}"},
+		{"lone marker", "`-`", "{{-}}"},
+		{"brace in prose", "use {id} here", "use \\{id\\} here"},
+		{"double brace in prose", "a {{b}} c", "a \\{\\{b\\}\\} c"},
+		{"bracket in prose", "[not a link] and - [ ] todo", "\\[not a link\\] and - \\[ \\] todo"},
+		{"already escaped", "keep \\{this\\}", "keep \\{this\\}"},
+		{"mention kept", "ping [~jdoe] please", "ping [~jdoe] please"},
+		{"link kept", "see [the repo](https://x.io/a_b)", "see [the repo|https://x.io/a_b]"},
+		{"ordered > bullet", "1. one\n   - nested\n2. two", "# one\n#* nested\n# two"},
+		{"bullet > ordered", "- one\n  1. nested\n- two", "* one\n*# nested\n* two"},
+		{"list restarts after text", "1. a\n\ntext\n\n- b", "# a\n\ntext\n\n* b"},
+	}
+	for _, c := range cases {
+		if got := MarkdownToWiki(c.in); got != c.want {
+			t.Errorf("%s:\n in:   %q\n got:  %q\n want: %q", c.name, c.in, got, c.want)
+		}
+	}
+}
+
+func TestWikiToMarkdownMixedListsAndEntities(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"numbered > bullet", "# one\n#* nested\n# two", "1. one\n   - nested\n1. two"},
+		{"bullet > numbered", "* one\n*# nested", "- one\n  1. nested"},
+		{"three levels", "# a\n#* b\n#*# c", "1. a\n   - b\n     1. c"},
+		{"entities in code", "{{map&#91;string&#93;any&#123;&#125;}}", "`map[string]any{}`"},
+	}
+	for _, c := range cases {
+		if got := WikiToMarkdown(c.in); got != c.want {
+			t.Errorf("%s:\n in:   %q\n got:  %q\n want: %q", c.name, c.in, got, c.want)
+		}
+	}
+}
+
+func TestRoundTripInlineCode(t *testing.T) {
+	for _, md := range []string{
+		"call `{{template}}` with `map[string]any{\"a\": 1}`",
+		"run `see -this- and +that+`",
+		"1. one\n   - nested\n1. two",
+	} {
+		if got := WikiToMarkdown(MarkdownToWiki(md)); got != md {
+			t.Errorf("round trip:\n in:  %q\n got: %q", md, got)
+		}
+	}
+}

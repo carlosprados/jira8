@@ -12,7 +12,7 @@ var worklogListCmd = &cobra.Command{
 	Use:     "worklog-list ISSUE-KEY",
 	Aliases: []string{"wll"},
 	Short:   "List worklog entries for an issue",
-	Example: "  jira8 issue worklog-list ESA-123",
+	Example: "  jira8 issue worklog-list ABC-123",
 	Args:    cobra.ExactArgs(1),
 	RunE:    runWorklogList,
 }

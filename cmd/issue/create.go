@@ -26,9 +26,9 @@ func init() {
 	createCmd.Flags().String("description-file", "", "Read description from file (use - for stdin)")
 	createCmd.Flags().String("assignee", "", "Assignee username (use 'me' for current user)")
 	createCmd.Flags().String("priority", "", "Issue priority")
-	createCmd.Flags().String("parent", "", "Parent issue key for Sub-task creation (e.g. ESA-65)")
+	createCmd.Flags().String("parent", "", "Parent issue key for Sub-task creation (e.g. ABC-65)")
 	createCmd.Flags().String("epic-name", "", "Epic Name (required when --type Epic)")
-	createCmd.Flags().String("epic-link", "", "Epic key to associate this issue with (e.g. ESA-42)")
+	createCmd.Flags().String("epic-link", "", "Epic key to associate this issue with (e.g. ABC-42)")
 	createCmd.Flags().Bool("markdown", false, "Treat --description as Markdown and convert to Jira Wiki Markup before sending")
 	createCmd.Flags().StringArray("attach", nil, "Attach a file (repeatable, e.g. --attach a.png --attach b.log)")
 
@@ -40,9 +40,9 @@ func runCreate(cmd *cobra.Command, args []string) error {
 
 	summary, _ := cmd.Flags().GetString("summary")
 	issueType, _ := cmd.Flags().GetString("type")
-	project, _ := cmd.Flags().GetString("project")
-	if project == "" {
-		project = a.Config.Project
+	project, err := app.ProjectKey(cmd)
+	if err != nil {
+		return err
 	}
 	description, _, err := app.ReadTextInput(cmd, "description", "description-file")
 	if err != nil {
