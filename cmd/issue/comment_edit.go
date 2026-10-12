@@ -13,7 +13,7 @@ var commentEditCmd = &cobra.Command{
 	Use:     "comment-edit ISSUE-KEY",
 	Aliases: []string{"ce"},
 	Short:   "Edit a comment on an issue",
-	Example: `  jira8 issue comment-edit ESA-123 --id 84887 --body "Updated text"`,
+	Example: `  jira8 issue comment-edit ABC-123 --id 84887 --body "Updated text"`,
 	Args:    cobra.ExactArgs(1),
 	RunE:    runCommentEdit,
 }

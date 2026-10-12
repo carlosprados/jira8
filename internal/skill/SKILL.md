@@ -6,32 +6,53 @@ description: Read and change issues in a Jira Server 8 / Data Center instance fr
 # jira8 — Jira Server 8 from the shell
 
 `jira8` talks to a Jira **Server/Data Center 8** instance (REST API v2) with the
-user's own credentials (`~/.jira.yaml` or `JIRA_*` env vars). Everything is a
-CLI subcommand; there is no MCP server.
+user's own credentials. Everything is a CLI subcommand; there is no MCP server.
 
 ```sh
 jira8 --help · jira8 <group> <cmd> --help     # every command has examples
 jira8 skill show                               # this document
 ```
 
+Configuration lives in `~/.jira.yaml` (or `JIRA_URL`, `JIRA_TOKEN`,
+`JIRA_USER`/`JIRA_PASSWORD`, `JIRA_PROJECT`): `url` and credentials are
+required, `project` is the default for commands that need one. Never edit it or
+ask for credentials yourself: if it is missing or wrong, tell the user.
+
+## Output
+
 Pass **`-o json`** whenever you will read the output. Text output is for humans,
-is coloured and may change. JSON is the raw Jira payload (`key`, `self`,
-`fields.*`), so field names follow the Jira REST API.
+is coloured and may change. Every Jira command honours `-o json`, writes included.
+
+| Command | JSON |
+|---|---|
+| `issue list`, `epic list`, `epic children` | array of issues (`key`, `fields.*`) |
+| `issue view` | one issue; `fields.comment.comments[]`, `changelog` with `--with-history` |
+| `comment-list`, `worklog-list`, `attachment list` | array (`id`, `body` / `timeSpent`, `started`, `comment` / `filename`) |
+| `issue create`, `epic create` | `{id, key, self}` (+ `attachments[]`) |
+| `comment-add`, `comment-edit`, `worklog-add`, `attachment add` | the created object(s), with their `id` |
+| `issue edit`, `epic edit` | `{key, updated: [field ids]}` (+ `attachments[]`) |
+| `transition` | `{key, transition, status}` |
+| `link` | `{outward, type, inward}` |
+| `*-delete`, `attachment delete` | `{…, id, deleted: true}` |
+
+Issues are the Jira REST payload, so field names follow the Jira API
+(`fields.status.name`, `fields.assignee.name`…). Chain steps with `jq`:
+
+```sh
+KEY=$(jira8 issue create --project ABC --type Task --summary "…" -o json | jq -r .key)
+```
 
 ## Find out before you write
 
 Never guess names: Jira rejects unknown values and each project differs.
 
 ```sh
-jira8 project types --project ABC -o json        # valid issue types for create
+jira8 project types --project ABC -o json        # issue types; subtask:true needs --parent
 jira8 project statuses --project ABC -o json     # statuses per issue type
 jira8 project priorities -o json
 jira8 issue transitions ABC-123 -o json          # transitions valid NOW for this issue
 jira8 issue link-types -o json
 ```
-
-The default project comes from config (`project:`); pass `--project` when the
-task names another one.
 
 ## Read
 
@@ -39,15 +60,17 @@ task names another one.
 jira8 issue list --status "In Progress" --assignee me -o json
 jira8 issue list --type Bug --max 100 -o json
 jira8 issue list --jql 'project = ABC AND updated >= -7d ORDER BY updated DESC' -o json
-jira8 issue view ABC-123 -o json                 # includes fields.comment.comments[]
+jira8 issue view ABC-123 -o json
 jira8 issue view ABC-123 --with-history -o json  # + changelog.histories[]
 jira8 issue comment-list ABC-123 -o json
 jira8 issue worklog-list ABC-123 -o json
-jira8 epic view ABC-42 -o json                   # Epic + children (--no-children to skip)
+jira8 epic view ABC-42 -o json                   # {epic, children} (--no-children to skip)
 jira8 epic children ABC-42 -o json
 ```
 
 - `--jql` overrides every other filter of `issue list`. `--max` defaults to 50.
+  Without `--project` and without a configured project, `issue list` searches
+  every project.
 - `--with-history` returns the full changelog. Description edits store the
   whole text each time: one issue can carry ~1 MB of history. In JSON nothing
   is trimmed, so extract what you need with `jq` instead of reading it whole:
@@ -67,11 +90,15 @@ Markup**, not Markdown and not ADF. Add `--markdown`:
 Without the flag, write commands send the text verbatim, so Markdown would show
 up literally in Jira (`**bold**` stays with asterisks).
 
-Reading converts headings, emphasis, inline code, `{code}`/`{noformat}` blocks,
-quotes, lists, tables, links, `[~user]` (→ `@user`) and images (→ attachment
-name, not a URL); `{color}`, `{panel}`, `{anchor}` are dropped. Emoticons,
-`+underline+`, `{toc}` and other macros stay literal. **History values are
-never converted.**
+Writing converts headings, emphasis, code (inline and fenced, with language),
+quotes, nested and mixed lists, tables and links, and escapes what Jira would
+misread (`{…}`, `[…]`, braces inside inline code). To mention someone write
+`[~username]`: it is sent as is. `@username` is not converted.
+
+Reading converts the same back, plus `{noformat}`, `[~user]` (→ `@user`) and
+images (→ attachment name, not a URL); `{color}`, `{panel}`, `{anchor}` are
+dropped. Emoticons, `+underline+`, `{toc}` and other macros stay literal.
+**History values are never converted.**
 
 For long text use a file or stdin instead of a quoted argument:
 
@@ -85,28 +112,33 @@ cat notes.md | jira8 issue comment-add ABC-123 --markdown --body-file -
 ## Write
 
 ```sh
-jira8 issue create --project ABC --type Bug --priority High --summary "…" --markdown --description-file bug.md
+jira8 issue create --project ABC --type Bug --priority Major --summary "…" --markdown --description-file bug.md
 jira8 issue create --project ABC --type Sub-task --parent ABC-123 --summary "…"
 jira8 issue create --project ABC --type Story --epic-link ABC-42 --summary "…" --attach log.txt
-jira8 issue edit ABC-123 --assignee me --priority Major
+jira8 issue edit ABC-123 --assignee me --priority Critical
 jira8 issue edit ABC-123 --assignee ""           # unassign ("" clears: also --epic-link, --due-date)
 jira8 issue edit ABC-123 --due-date 2026-11-30 --original-estimate 3d
 jira8 issue transition ABC-123 --to "In Progress"
 jira8 issue comment-add ABC-123 --markdown --body "…"
 jira8 issue comment-edit ABC-123 --id 84887 --markdown --body "…"
-jira8 issue worklog-add ABC-123 --time 2h --comment "…"        # --date for past work
+jira8 issue worklog-add ABC-123 --time 1h30m --date 2026-10-09 --comment "…"
 jira8 issue link ABC-1 ABC-2 --type Blocks       # ABC-1 blocks ABC-2
 jira8 issue attachment add ABC-123 a.png b.log
 ```
 
-- `issue edit` only sends the flags you pass; everything else is untouched.
+- `issue edit` only sends the flags you pass, and is all or nothing: if Jira
+  rejects one field, none changes.
 - `--assignee me` resolves the current user. Users are Jira **usernames**
   (`{"name": …}`), not Cloud `accountId`s.
-- `--original-estimate` is the up-front estimate. Time actually spent goes in
-  `worklog-add`.
+- Durations (`--time`, `--original-estimate`) take `w d h m`: `2h`, `1h30m`,
+  `3d`. `--original-estimate` is the up-front estimate; time actually spent
+  goes in `worklog-add`.
+- `worklog-add --date`: `YYYY-MM-DD` (09:00 local time), `YYYY-MM-DDTHH:MM`
+  (local) or RFC 3339. Default: now.
 - `transition --to` takes the **transition** name shown by `issue transitions`,
   which is not always the target status name. On a miss, the error lists the
-  valid ones.
+  valid ones. A transition cannot set a resolution or add a comment: add the
+  comment with `comment-add`.
 - `issue create` uploads attachments after creating the issue. If the upload
   fails, the issue still exists: the error gives its key, retry with
   `issue attachment add`.
@@ -135,22 +167,36 @@ jira8 epic edit ABC-42 --name "Billing v2 (rev)"
 
 ## Destructive commands
 
-`comment-delete` and `worklog-delete` ask for confirmation on the terminal.
-Without one (your case) they read EOF and abort, so pass `--yes`, and only
-after the user confirmed that exact deletion. **`attachment delete` does not
-ask**: it deletes immediately. Nothing deleted can be recovered.
+`comment-delete`, `worklog-delete` and `attachment delete` ask on a terminal.
+Without one (your case) they fail with exit 1 unless you pass `--yes`. Pass it
+only after the user confirmed that exact deletion: nothing deleted can be
+recovered.
 
 ## Not possible with jira8
 
-- Moving an issue to another project: Jira Server 8 has no REST endpoint for it.
-  It must be done in the web UI.
-- Deleting or cloning issues, sprints, filters, dashboards, admin settings.
+Say so instead of improvising with the REST API:
+
+- labels, components, fix/affects versions, sprints, watchers, votes and custom
+  fields other than Epic Name/Link;
+- a resolution or a screen on a transition;
+- deleting, cloning or moving issues to another project (Jira Server 8 has no
+  REST endpoint to move; it is done in the web UI);
+- filters, dashboards, boards configuration, admin settings.
 
 ## Errors
 
-Jira errors read `Error: Jira API error (HTTP n): message; field: message` and
-exit 1. A `400` naming a field usually means an invalid name: check
-`project types|statuses|priorities` or `issue transitions`. `401` is bad
-credentials, `403` no permission, and `404` "Issue Does Not Exist" may just mean
-the issue is not visible to the user. `429` (rate limit) is retried
-automatically. Only a wrong flag or argument prints the command usage.
+Errors go to stderr as one line and exit 1. Only a wrong flag or argument also
+prints the command usage.
+
+- `Jira API error (HTTP n): message; field: message`:
+  - `400` naming a value (`Priority name 'High' is not valid`): check
+    `project types|statuses|priorities` or `issue transitions`;
+  - `400` "Field 'x' cannot be set. It is not on the appropriate screen": the
+    project does not expose that field; nothing jira8 can do, tell the user;
+  - `400` "Issue type is a sub-task but parent issue key…": add `--parent`;
+  - `401` bad credentials, `403` no permission, `404` "Issue Does Not Exist"
+    may just mean the issue is not visible to the user;
+  - `429` (rate limit) is retried automatically.
+- `cannot reach Jira (check the network or VPN)`: the server is not reachable
+  from this machine. Do not retry in a loop or touch the config; tell the user.
+- `no project: pass --project KEY…`: pass `--project`.

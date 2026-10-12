@@ -16,3 +16,13 @@ func OutputJSON(v any) error {
 	fmt.Println(string(data))
 	return nil
 }
+
+// Done reports a write that Jira answers without a body: the formatted text
+// for humans, v with -o json, so scripts always get JSON when they ask for it.
+func Done(v any, format string, args ...any) error {
+	if Get().Output == "json" {
+		return OutputJSON(v)
+	}
+	fmt.Printf(format+"\n", args...)
+	return nil
+}

@@ -12,7 +12,7 @@ import (
 var statusesCmd = &cobra.Command{
 	Use:     "statuses",
 	Short:   "List statuses grouped by issue type",
-	Example: "  jira8 project statuses --project ESA",
+	Example: "  jira8 project statuses --project ABC",
 	RunE:    runStatuses,
 }
 
@@ -23,9 +23,9 @@ func init() {
 func runStatuses(cmd *cobra.Command, args []string) error {
 	a := app.Get()
 
-	project, _ := cmd.Flags().GetString("project")
-	if project == "" {
-		project = a.Config.Project
+	project, err := app.ProjectKey(cmd)
+	if err != nil {
+		return err
 	}
 
 	result, err := a.Client.GetProjectStatuses(context.Background(), project)

@@ -64,6 +64,10 @@ token: <your-personal-access-token>
 project: MYPROJ
 ```
 
+`url` and the credentials are required. `project` is optional: without it,
+commands that need a project ask for `--project`, and `issue list` searches
+every project you can see.
+
 ### Configuration priority (highest to lowest)
 
 1. CLI flags (`--url`, `--token`, `--project`; `--config` picks another file)
@@ -229,7 +233,8 @@ jira8 issue comment-delete MYPROJ-123 --id 84887             # asks for confirma
 ```bash
 jira8 issue worklog-list MYPROJ-123                                  # list worklogs
 jira8 issue worklog-add MYPROJ-123 --time 2h --comment "Investig."   # add a worklog
-jira8 issue worklog-add MYPROJ-123 --time 30m --date 2026-04-15T09:00:00.000+0200
+jira8 issue worklog-add MYPROJ-123 --time 30m --date 2026-04-15         # 09:00 local time
+jira8 issue worklog-add MYPROJ-123 --time 1h --date 2026-04-15T16:30    # or RFC 3339
 jira8 issue worklog-delete MYPROJ-123 --id 27705             # asks for confirmation; --yes skips it
 ```
 
@@ -238,13 +243,16 @@ jira8 issue worklog-delete MYPROJ-123 --id 27705             # asks for confirma
 ```bash
 jira8 issue attachment add MYPROJ-123 diag.png trace.log       # upload one or more files
 jira8 issue attachment list MYPROJ-123                         # list attachments
-jira8 issue attachment delete 45821                            # delete by attachment ID
+jira8 issue attachment delete 45821                            # by attachment ID; asks, --yes skips it
 
 # Or attach at create/edit time:
 jira8 issue create --summary "Crash on login" --type Bug \
     --attach screenshot.png --attach trace.log
 jira8 issue edit MYPROJ-123 --attach extra-evidence.pdf        # attach without touching other fields
 ```
+
+The three delete commands ask for confirmation on a terminal. Without one
+(a script, an agent) they fail with exit 1 unless you pass `--yes`.
 
 Uploads stream from disk so large files do not get buffered in memory. The
 upload step is separate from create/edit (Jira's `/issue` endpoint does not
@@ -294,7 +302,7 @@ Reading produces GitHub-flavoured Markdown and never HTML. What converts:
 | `*bold*`, `_italic_`, `-strike-`, `{{code}}` | `**bold**`, `*italic*`, `~~strike~~`, `` `code` `` |
 | `{code:lang}` / `{noformat}` blocks, also when the tag shares a line with text | fenced blocks, content untouched |
 | `{quote}`, `bq.` | `>` |
-| `*` / `#` lists, nested | `-` / `1.` lists, two spaces per level |
+| `*` / `#` lists, nested and mixed (`#*`) | `-` / `1.` lists, indented under the parent's text |
 | `\|\|head\|\|` tables, also without a header row | GFM tables (an empty header is added when missing) |
 | `[text\|url]`, `[url]`, `[MYPROJ-1]`, `[~user]` | `[text](url)`, `<url>`, `MYPROJ-1`, `@user` |
 | `!image.png!`, `!image.png\|thumbnail!` | `![image.png](image.png)` (attachment name, not a URL) |
@@ -302,6 +310,12 @@ Reading produces GitHub-flavoured Markdown and never HTML. What converts:
 
 Emoticons, `+underline+`, `^sup^`, `~sub~`, `{toc}` and other macros stay
 literal. History values (`--with-history`) are never converted.
+
+Writing does the reverse and escapes what Jira would misread: a bare `{x}` (a
+macro to Jira) or `[x]` (a link) in prose, and braces, brackets or `-x-`-style
+effect markers inside inline code, which Jira otherwise renders even within
+`{{…}}`. A list nested under a numbered one becomes `#*`. Write `[~username]`
+to mention someone; `@username` is not converted.
 
 ## Agent skill
 
@@ -312,7 +326,7 @@ skills:
 
 ```bash
 jira8 skill install              # ~/.claude/skills/jira8/SKILL.md
-jira8 skill install --project    # ./.claude/skills/jira8/SKILL.md
+jira8 skill install --repo       # ./.claude/skills/jira8/SKILL.md
 jira8 skill show                 # print it
 ```
 

@@ -26,7 +26,7 @@ correctly instead of guessing.
 The document is embedded in this binary, so it always matches it:
 
   jira8 skill install             into ~/.claude/skills/jira8/SKILL.md
-  jira8 skill install --project   into ./.claude/skills/jira8/SKILL.md
+  jira8 skill install --repo      into ./.claude/skills/jira8/SKILL.md
   jira8 skill show                print it
   jira8 skill path                where install would write
 
@@ -46,7 +46,7 @@ var skillShowCmd = &cobra.Command{
 var skillPathCmd = &cobra.Command{
 	Use:     "path",
 	Short:   "Print where the skill would be installed",
-	Example: "  jira8 skill path\n  jira8 skill path --project",
+	Example: "  jira8 skill path\n  jira8 skill path --repo",
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		p, err := skillPath(cmd)
 		if err != nil {
@@ -60,7 +60,7 @@ var skillPathCmd = &cobra.Command{
 var skillInstallCmd = &cobra.Command{
 	Use:     "install",
 	Short:   "Write the embedded skill where an agent will find it",
-	Example: "  jira8 skill install\n  jira8 skill install --force      # after upgrading jira8\n  jira8 skill install --project    # only for the current repo",
+	Example: "  jira8 skill install\n  jira8 skill install --force      # after upgrading jira8\n  jira8 skill install --repo       # only for the current repo",
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		p, err := skillPath(cmd)
 		if err != nil {
@@ -89,7 +89,7 @@ var skillInstallCmd = &cobra.Command{
 
 func skillPath(cmd *cobra.Command) (string, error) {
 	var base string
-	if project, _ := cmd.Flags().GetBool("project"); project {
+	if repo, _ := cmd.Flags().GetBool("repo"); repo {
 		wd, err := os.Getwd()
 		if err != nil {
 			return "", err
@@ -107,7 +107,7 @@ func skillPath(cmd *cobra.Command) (string, error) {
 
 func init() {
 	for _, c := range []*cobra.Command{skillInstallCmd, skillPathCmd} {
-		c.Flags().Bool("project", false, "Use ./.claude/skills instead of ~/.claude/skills")
+		c.Flags().Bool("repo", false, "Use ./.claude/skills (this repository) instead of ~/.claude/skills")
 	}
 	skillInstallCmd.Flags().Bool("force", false, "Overwrite an existing, different SKILL.md")
 	skillCmd.AddCommand(skillInstallCmd, skillShowCmd, skillPathCmd)

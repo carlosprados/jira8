@@ -14,7 +14,7 @@ import (
 var viewCmd = &cobra.Command{
 	Use:     "view EPIC-KEY",
 	Short:   "View Epic details and its linked children",
-	Example: "  jira8 epic view ESA-42",
+	Example: "  jira8 epic view ABC-42",
 	Args:    cobra.ExactArgs(1),
 	RunE:    runView,
 }

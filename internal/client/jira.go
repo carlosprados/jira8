@@ -139,7 +139,7 @@ func (c *Client) doAt(ctx context.Context, method, apiPath string, body any) ([]
 
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
-			return nil, fmt.Errorf("executing request: %w", err)
+			return nil, fmt.Errorf("cannot reach Jira (check the network or VPN): %w", err)
 		}
 
 		respBody, err := io.ReadAll(resp.Body)

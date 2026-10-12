@@ -14,7 +14,7 @@ var commentAddCmd = &cobra.Command{
 	Use:     "comment-add ISSUE-KEY",
 	Aliases: []string{"ca"},
 	Short:   "Add a comment to an issue",
-	Example: `  jira8 issue comment-add ESA-123 --body "Deployed to staging"`,
+	Example: `  jira8 issue comment-add ABC-123 --body "Deployed to staging"`,
 	Args:    cobra.ExactArgs(1),
 	RunE:    runCommentAdd,
 }

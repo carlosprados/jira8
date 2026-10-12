@@ -3,6 +3,8 @@ package epic
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 
 	"github.com/amplia/jira8/cmd/app"
 	"github.com/amplia/jira8/internal/markup"
@@ -13,7 +15,7 @@ import (
 var editCmd = &cobra.Command{
 	Use:     "edit EPIC-KEY",
 	Short:   "Edit an Epic",
-	Example: "  jira8 epic edit ESA-42 --name \"Renamed epic\" --summary \"New summary\"",
+	Example: "  jira8 epic edit ABC-42 --name \"Renamed epic\" --summary \"New summary\"",
 	Args:    cobra.ExactArgs(1),
 	RunE:    runEdit,
 }
@@ -80,6 +82,5 @@ func runEdit(cmd *cobra.Command, args []string) error {
 	if err := a.Client.EditIssue(context.Background(), key, req); err != nil {
 		return err
 	}
-	fmt.Printf("Updated Epic %s\n", key)
-	return nil
+	return app.Done(map[string]any{"key": key, "updated": slices.Sorted(maps.Keys(fields))}, "Updated Epic %s", key)
 }

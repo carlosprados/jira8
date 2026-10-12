@@ -12,7 +12,7 @@ import (
 var childrenCmd = &cobra.Command{
 	Use:     "children EPIC-KEY",
 	Short:   "List issues linked to an Epic",
-	Example: "  jira8 epic children ESA-42",
+	Example: "  jira8 epic children ABC-42",
 	Args:    cobra.ExactArgs(1),
 	RunE:    runChildren,
 }

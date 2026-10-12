@@ -10,7 +10,7 @@ import (
 var viewCmd = &cobra.Command{
 	Use:     "view ISSUE-KEY",
 	Short:   "View issue details",
-	Example: "  jira8 issue view ESA-123\n  jira8 issue view ESA-123 --with-history",
+	Example: "  jira8 issue view ABC-123\n  jira8 issue view ABC-123 --with-history",
 	Args:    cobra.ExactArgs(1),
 	RunE:    runView,
 }

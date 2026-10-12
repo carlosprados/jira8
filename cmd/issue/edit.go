@@ -3,6 +3,8 @@ package issue
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 
 	"github.com/amplia/jira8/cmd/app"
 	"github.com/amplia/jira8/internal/markup"
@@ -13,9 +15,9 @@ import (
 var editCmd = &cobra.Command{
 	Use:   "edit ISSUE-KEY",
 	Short: "Edit an issue",
-	Example: `  jira8 issue edit ESA-123 --summary "New title" --assignee me
-  jira8 issue edit ESA-123 --due-date 2026-09-24 --original-estimate 5d
-  jira8 issue edit ESA-123 --due-date ""              # clear the due date`,
+	Example: `  jira8 issue edit ABC-123 --summary "New title" --assignee me
+  jira8 issue edit ABC-123 --due-date 2026-09-24 --original-estimate 5d
+  jira8 issue edit ABC-123 --due-date ""              # clear the due date`,
 	Args: cobra.ExactArgs(1),
 	RunE: runEdit,
 }
@@ -29,7 +31,7 @@ func init() {
 	editCmd.Flags().String("epic-name", "", "New Epic Name (only valid on Epic issues)")
 	editCmd.Flags().String("epic-link", "", "Epic key to associate this issue with (empty to detach)")
 	editCmd.Flags().String("due-date", "", "Due date, format YYYY-MM-DD (empty to clear)")
-	editCmd.Flags().String("original-estimate", "", "Original time estimate, Jira shorthand e.g. 3d, 5h, 30m")
+	editCmd.Flags().String("original-estimate", "", "Original time estimate, e.g. 3d, 5h, 1h30m")
 	editCmd.Flags().Bool("markdown", false, "Treat --description as Markdown and convert to Jira Wiki Markup before sending")
 	editCmd.Flags().StringArray("attach", nil, "Attach a file to the issue (repeatable). Can be used alone, without other field edits.")
 }
@@ -102,6 +104,12 @@ func runEdit(cmd *cobra.Command, args []string) error {
 
 	if cmd.Flags().Changed("original-estimate") {
 		v, _ := cmd.Flags().GetString("original-estimate")
+		if v != "" {
+			var err error
+			if v, err = app.JiraDuration(v); err != nil {
+				return err
+			}
+		}
 		fields["timetracking"] = models.TimeTracking{OriginalEstimate: v}
 	}
 
@@ -116,19 +124,32 @@ func runEdit(cmd *cobra.Command, args []string) error {
 		if err := a.Client.EditIssue(context.Background(), key, req); err != nil {
 			return err
 		}
-		fmt.Printf("Updated %s\n", key)
 	}
 
+	var uploaded []models.Attachment
 	if len(attachFiles) > 0 {
-		uploaded, err := a.Client.AddAttachments(context.Background(), key, attachFiles)
+		var err error
+		uploaded, err = a.Client.AddAttachments(context.Background(), key, attachFiles)
 		if err != nil {
 			return fmt.Errorf("attaching files to %s: %w", key, err)
 		}
+	}
+
+	if a.Output == "json" {
+		return app.OutputJSON(struct {
+			Key         string              `json:"key"`
+			Updated     []string            `json:"updated"`
+			Attachments []models.Attachment `json:"attachments,omitempty"`
+		}{key, slices.Sorted(maps.Keys(fields)), uploaded})
+	}
+	if len(fields) > 0 {
+		fmt.Printf("Updated %s\n", key)
+	}
+	if len(uploaded) > 0 {
 		fmt.Printf("Uploaded %d attachment(s) to %s:\n", len(uploaded), key)
 		for _, att := range uploaded {
 			fmt.Printf("  %s  %s  (%s)\n", labelStyle.Render("#"+att.ID), att.Filename, humanSize(att.Size))
 		}
 	}
-
 	return nil
 }

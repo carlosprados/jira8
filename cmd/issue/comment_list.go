@@ -13,7 +13,7 @@ var commentListCmd = &cobra.Command{
 	Use:     "comment-list ISSUE-KEY",
 	Aliases: []string{"cl"},
 	Short:   "List comments on an issue",
-	Example: "  jira8 issue comment-list ESA-123",
+	Example: "  jira8 issue comment-list ABC-123",
 	Args:    cobra.ExactArgs(1),
 	RunE:    runCommentList,
 }

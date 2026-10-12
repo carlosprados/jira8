@@ -13,7 +13,7 @@ import (
 var listCmd = &cobra.Command{
 	Use:     "list",
 	Short:   "List Epics in a project",
-	Example: "  jira8 epic list\n  jira8 epic list --project ESA --status \"In Progress\"",
+	Example: "  jira8 epic list\n  jira8 epic list --project ABC --status \"In Progress\"",
 	RunE:    runList,
 }
 
@@ -27,9 +27,9 @@ func init() {
 func runList(cmd *cobra.Command, args []string) error {
 	a := app.Get()
 
-	project, _ := cmd.Flags().GetString("project")
-	if project == "" {
-		project = a.Config.Project
+	project, err := app.ProjectKey(cmd)
+	if err != nil {
+		return err
 	}
 	status, _ := cmd.Flags().GetString("status")
 	max, _ := cmd.Flags().GetInt("max")

@@ -14,15 +14,16 @@ var worklogAddCmd = &cobra.Command{
 	Use:     "worklog-add ISSUE-KEY",
 	Aliases: []string{"wla"},
 	Short:   "Add a worklog entry to an issue",
-	Example: `  jira8 issue worklog-add ESA-123 --time 2h --comment "Sprint review"
-  jira8 issue worklog-add ESA-123 --time 30m --date "2026-04-07T09:00:00.000+0200"`,
+	Example: `  jira8 issue worklog-add ABC-123 --time 2h --comment "Sprint review"
+  jira8 issue worklog-add ABC-123 --time 30m --date 2026-04-07          # 09:00 local time
+  jira8 issue worklog-add ABC-123 --time 1h30m --date 2026-04-07T15:00`,
 	Args: cobra.ExactArgs(1),
 	RunE: runWorklogAdd,
 }
 
 func init() {
-	worklogAddCmd.Flags().String("time", "", "Time spent (e.g., 2h, 30m, 1d) (required)")
-	worklogAddCmd.Flags().String("date", "", "Start date/time in ISO 8601 (optional, defaults to now)")
+	worklogAddCmd.Flags().String("time", "", "Time spent, e.g. 2h, 30m, 1h30m, 1d (required)")
+	worklogAddCmd.Flags().String("date", "", "Start: YYYY-MM-DD (09:00), YYYY-MM-DDTHH:MM (local) or RFC 3339; defaults to now")
 	worklogAddCmd.Flags().String("comment", "", "Worklog comment (optional)")
 	worklogAddCmd.Flags().String("comment-file", "", "Read worklog comment from file (use - for stdin)")
 	worklogAddCmd.Flags().Bool("markdown", false, "Treat --comment as Markdown and convert to Jira Wiki Markup before sending")
@@ -34,7 +35,15 @@ func runWorklogAdd(cmd *cobra.Command, args []string) error {
 	key := args[0]
 
 	timeSpent, _ := cmd.Flags().GetString("time")
-	started, _ := cmd.Flags().GetString("date")
+	timeSpent, err := app.JiraDuration(timeSpent)
+	if err != nil {
+		return err
+	}
+	date, _ := cmd.Flags().GetString("date")
+	started, err := app.WorklogStarted(date)
+	if err != nil {
+		return err
+	}
 	comment, _, err := app.ReadTextInput(cmd, "comment", "comment-file")
 	if err != nil {
 		return err

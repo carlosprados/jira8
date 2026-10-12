@@ -15,10 +15,10 @@ var linkCmd = &cobra.Command{
 	Short: "Link two issues (e.g. Relates, Blocks, Duplicate)",
 	Long: "Create a link between two issues. The first key is the subject of the " +
 		"relationship and the second its object (\"OUTWARD <phrase> INWARD\", e.g. " +
-		"\"ESA-207 blocks ESA-214\"). For symmetric types like Relates the order is irrelevant.\n\n" +
+		"\"ABC-207 blocks ABC-214\"). For symmetric types like Relates the order is irrelevant.\n\n" +
 		"Run 'jira8 issue link-types' to see the available type names.",
-	Example: "  jira8 issue link ESA-207 ESA-214 --type \"Relates\"\n" +
-		"  jira8 issue link ESA-9 ESA-10 --type \"Blocks\" --comment \"blocked until merge\"",
+	Example: "  jira8 issue link ABC-207 ABC-214 --type \"Relates\"\n" +
+		"  jira8 issue link ABC-9 ABC-10 --type \"Blocks\" --comment \"blocked until merge\"",
 	Args: cobra.ExactArgs(2),
 	RunE: runLink,
 }
@@ -65,8 +65,8 @@ func runLink(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Printf("Linked %s %s %s\n", outward, match.Outward, inward)
-	return nil
+	return app.Done(map[string]string{"outward": outward, "type": match.Name, "inward": inward},
+		"Linked %s %s %s", outward, match.Outward, inward)
 }
 
 func runLinkTypes(cmd *cobra.Command, args []string) error {

@@ -13,7 +13,7 @@ import (
 var transitionCmd = &cobra.Command{
 	Use:     "transition ISSUE-KEY",
 	Short:   "Transition an issue to a new status",
-	Example: "  jira8 issue transition ESA-123 --to \"Done\"",
+	Example: "  jira8 issue transition ABC-123 --to \"Done\"",
 	Args:    cobra.ExactArgs(1),
 	RunE:    runTransition,
 }
@@ -21,7 +21,7 @@ var transitionCmd = &cobra.Command{
 var transitionsCmd = &cobra.Command{
 	Use:     "transitions ISSUE-KEY",
 	Short:   "List available transitions for an issue",
-	Example: "  jira8 issue transitions ESA-123",
+	Example: "  jira8 issue transitions ABC-123",
 	Args:    cobra.ExactArgs(1),
 	RunE:    runTransitions,
 }
@@ -58,8 +58,8 @@ func runTransition(cmd *cobra.Command, args []string) error {
 	if match.To != nil {
 		target = match.To.Name
 	}
-	fmt.Printf("Transitioned %s → %s\n", key, target)
-	return nil
+	return app.Done(map[string]string{"key": key, "transition": match.Name, "status": target},
+		"Transitioned %s → %s", key, target)
 }
 
 func runTransitions(cmd *cobra.Command, args []string) error {

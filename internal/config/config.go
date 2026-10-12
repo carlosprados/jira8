@@ -30,9 +30,6 @@ func Load(configFile string) (*Config, error) {
 		viper.AddConfigPath("$HOME")
 	}
 
-	viper.SetDefault("url", "https://jira.amplia.es/jira")
-	viper.SetDefault("project", "ESA")
-
 	_ = viper.BindEnv("url", "JIRA_URL")
 	_ = viper.BindEnv("token", "JIRA_TOKEN")
 	_ = viper.BindEnv("user", "JIRA_USER")
@@ -51,6 +48,10 @@ func Load(configFile string) (*Config, error) {
 	var cfg Config
 	if err := viper.Unmarshal(&cfg); err != nil {
 		return nil, fmt.Errorf("parsing config: %w", err)
+	}
+
+	if cfg.URL == "" {
+		return nil, fmt.Errorf("url required: set 'url' in ~/.jira.yaml, JIRA_URL or --url")
 	}
 
 	hasToken := cfg.Token != ""
