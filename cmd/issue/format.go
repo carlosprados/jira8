@@ -133,6 +133,9 @@ func printIssueDetailWithEpic(issue *models.Issue, epicNameID, epicLinkID string
 	fmt.Printf("%s  %s\n", keyStyle.Render(issue.Key), headerStyle.Render(f.Summary))
 	fmt.Println(strings.Repeat("─", 60))
 
+	if issue.URL != "" {
+		printField("URL", issue.URL)
+	}
 	printField("Type", typeName(f.IssueType))
 	printField("Status", statusName(f.Status))
 	printField("Priority", priorityName(f.Priority))

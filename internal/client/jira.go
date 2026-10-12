@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -68,6 +69,10 @@ func parseAPIError(statusCode int, respBody []byte) *APIError {
 	}
 	return apiErr
 }
+
+// ErrUnreachable wraps the errors of requests that never got an answer from
+// Jira (network, DNS, VPN, timeout).
+var ErrUnreachable = errors.New("cannot reach Jira")
 
 // Client is the Jira REST API client.
 type Client struct {
@@ -145,7 +150,7 @@ func (c *Client) doAt(ctx context.Context, method, apiPath string, body any) ([]
 
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
-			return nil, fmt.Errorf("cannot reach Jira (check the network or VPN): %w", err)
+			return nil, fmt.Errorf("%w (check the network or VPN): %w", ErrUnreachable, err)
 		}
 
 		respBody, err := io.ReadAll(resp.Body)
@@ -196,6 +201,9 @@ func (c *Client) SearchIssues(ctx context.Context, jql string, startAt, maxResul
 	var result models.SearchResult
 	if err := json.Unmarshal(data, &result); err != nil {
 		return nil, fmt.Errorf("parsing search results: %w", err)
+	}
+	for i := range result.Issues {
+		result.Issues[i].URL = c.BrowseURL(result.Issues[i].Key)
 	}
 	return &result, nil
 }
@@ -256,6 +264,7 @@ func (c *Client) getIssue(ctx context.Context, key string, changelog bool) (*mod
 	if err := json.Unmarshal(data, &issue); err != nil {
 		return nil, fmt.Errorf("parsing issue: %w", err)
 	}
+	issue.URL = c.BrowseURL(issue.Key)
 	return &issue, nil
 }
 
@@ -270,7 +279,13 @@ func (c *Client) CreateIssue(ctx context.Context, req *models.CreateIssueRequest
 	if err := json.Unmarshal(data, &resp); err != nil {
 		return nil, fmt.Errorf("parsing create response: %w", err)
 	}
+	resp.URL = c.BrowseURL(resp.Key)
 	return &resp, nil
+}
+
+// BrowseURL is the address of an issue in the browser.
+func (c *Client) BrowseURL(key string) string {
+	return c.baseURL + "/browse/" + url.PathEscape(key)
 }
 
 // EditIssue updates an existing issue.

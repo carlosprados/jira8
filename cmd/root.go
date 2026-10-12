@@ -93,18 +93,38 @@ func init() {
 	rootCmd.AddCommand(epic.EpicCmd)
 	rootCmd.AddCommand(project.ProjectCmd)
 	rootCmd.AddCommand(user.UserCmd)
+	rootCmd.AddCommand(openCmd)
 	rootCmd.AddCommand(markupCmd)
 	rootCmd.AddCommand(skillCmd)
 }
 
-// Execute runs the root command.
+// strictGroups makes an unknown subcommand ("jira8 issue nope") a usage error.
+// Cobra would print the group's help and exit 0, which a script reads as
+// success.
+func strictGroups(c *cobra.Command) {
+	for _, sub := range c.Commands() {
+		if sub.HasSubCommands() && sub.Run == nil && sub.RunE == nil {
+			sub.Args = cobra.NoArgs
+			sub.RunE = func(cmd *cobra.Command, _ []string) error { return cmd.Help() }
+		}
+		strictGroups(sub)
+	}
+}
+
+// Execute runs the root command. Pass its error to ExitCode.
 func Execute() error {
+	strictGroups(rootCmd) // here, not in init: other files' init add subcommands
 	stdout := os.Stdout
-	err := rootCmd.Execute()
+	c, err := rootCmd.ExecuteC()
 	captured := os.Stdout
 	os.Stdout = stdout
 	if err != nil {
 		_, _ = fmt.Fprintf(rootCmd.ErrOrStderr(), "Error: %s\n", err)
+		// Every command hook sets SilenceUsage once flags and args are valid:
+		// still unset means cobra rejected the command line itself.
+		if !c.SilenceUsage {
+			return usageError{err}
+		}
 		return err
 	}
 	s := app.Get()
