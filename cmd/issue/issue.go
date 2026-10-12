@@ -14,6 +14,7 @@ func init() {
 	IssueCmd.AddCommand(viewCmd)
 	IssueCmd.AddCommand(createCmd)
 	IssueCmd.AddCommand(editCmd)
+	IssueCmd.AddCommand(fieldsCmd)
 	IssueCmd.AddCommand(transitionCmd)
 	IssueCmd.AddCommand(transitionsCmd)
 	IssueCmd.AddCommand(rankCmd)

@@ -148,6 +148,24 @@ sets `timetracking.originalEstimate`, in Jira's own shorthand (`3d`, `5h`,
 `30m`) — this is the up-front estimate, not time already spent; log actual
 hours worked with `issue worklog-add` instead.
 
+### Labels, components, versions and custom fields
+
+```bash
+jira8 issue create --summary "Export" --type Story --labels backend,api --field "Story Points=5"
+jira8 issue edit MYPROJ-123 --add-label urgent --remove-label triage
+jira8 issue edit MYPROJ-123 --labels ""                                # clear labels
+jira8 issue edit MYPROJ-123 --field "Component/s=core,ui" --field "Fix Version/s=2.4"
+jira8 issue edit MYPROJ-123 --field customfield_10300='{"value":"Gold"}'   # raw JSON
+```
+
+`--field NAME=VALUE` accepts a field name or id from `project fields` (create
+screen) or `issue fields KEY` (edit screen). The value is converted by field
+type (numbers, options, users, versions, components; arrays by commas or
+repeated flags), `""` clears it, and `{…}`/`[…]` is sent as raw JSON. Fields
+are checked against the screen before anything is written, so a field the
+project does not show, or a value outside its options, fails with the valid
+choices. `epic create|edit` take the same flags.
+
 ### Epics
 
 Dedicated ergonomic subcommand for Epic CRUD and child listing. Custom field IDs
@@ -262,13 +280,15 @@ fails, you get back the new key and the upload error so you can retry with
 
 ### Project metadata
 
-Query valid values for issue types, statuses, and priorities:
+Query valid values for issue types, statuses, priorities and fields:
 
 ```bash
 jira8 project types                       # issue types available for creation
 jira8 project statuses                    # statuses grouped by issue type
 jira8 project priorities                  # global priority levels
 jira8 project types --project OTHER         # for a different project
+jira8 project fields --type Bug           # fields on the create screen, with allowed values
+jira8 issue fields MYPROJ-123             # fields editable on this issue
 ```
 
 ### Output format

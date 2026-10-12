@@ -92,7 +92,7 @@ func TestSkillCommandsParse(t *testing.T) {
 	}
 	// The checker itself must reject what is wrong.
 	for _, bad := range []string{
-		"jira8 issue edit ABC-1 --labels x",
+		"jira8 issue edit ABC-1 --frobnicate x",
 		"jira8 issue frobnicate ABC-1",
 		"jira8 issue view",
 	} {

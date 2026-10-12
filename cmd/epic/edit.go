@@ -3,8 +3,6 @@ package epic
 import (
 	"context"
 	"fmt"
-	"maps"
-	"slices"
 
 	"github.com/amplia/jira8/cmd/app"
 	"github.com/amplia/jira8/internal/models"
@@ -12,11 +10,12 @@ import (
 )
 
 var editCmd = &cobra.Command{
-	Use:     "edit EPIC-KEY",
-	Short:   "Edit an Epic",
-	Example: "  jira8 epic edit ABC-42 --name \"Renamed epic\" --summary \"New summary\"",
-	Args:    cobra.ExactArgs(1),
-	RunE:    runEdit,
+	Use:   "edit EPIC-KEY",
+	Short: "Edit an Epic",
+	Example: "  jira8 epic edit ABC-42 --name \"Renamed epic\" --summary \"New summary\"\n" +
+		"  jira8 epic edit ABC-42 --add-label q3 --field \"Fix Version/s=2.5\"",
+	Args: cobra.ExactArgs(1),
+	RunE: runEdit,
 }
 
 func init() {
@@ -26,6 +25,8 @@ func init() {
 	editCmd.Flags().String("description-file", "", "Read new description from file (use - for stdin)")
 	editCmd.Flags().String("assignee", "", "New assignee (use 'me' for current user, empty to unassign)")
 	editCmd.Flags().String("priority", "", "New priority")
+	app.AddFieldFlags(editCmd)
+	app.AddLabelEditFlags(editCmd)
 	editCmd.Flags().Bool("markdown", false, "Treat --description as Markdown and convert it to Jira Wiki Markup; local images (![alt](path)) are attached to the issue")
 }
 
@@ -72,19 +73,23 @@ func runEdit(cmd *cobra.Command, args []string) error {
 		fields["priority"] = models.PriorityRef{Name: v}
 	}
 
-	if len(fields) == 0 {
-		return fmt.Errorf("no fields to update; use --name, --summary, --description, --assignee or --priority")
+	update, err := app.EditFields(cmd, key, fields)
+	if err != nil {
+		return err
+	}
+	if len(fields) == 0 && len(update) == 0 {
+		return fmt.Errorf("no fields to update; use --name, --summary, --description, --assignee, --priority, --labels, --add-label, --remove-label or --field")
 	}
 
 	uploaded, err := app.UploadImages(context.Background(), key, body.Images)
 	if err != nil {
 		return err
 	}
-	req := &models.EditIssueRequest{Fields: fields}
+	req := &models.EditIssueRequest{Fields: fields, Update: update}
 	if err := a.Client.EditIssue(context.Background(), key, req); err != nil {
 		return err
 	}
-	out := map[string]any{"key": key, "updated": slices.Sorted(maps.Keys(fields))}
+	out := map[string]any{"key": key, "updated": app.UpdatedFields(fields, update)}
 	if len(uploaded) > 0 {
 		out["attachments"] = uploaded
 	}

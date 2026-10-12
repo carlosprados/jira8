@@ -14,7 +14,8 @@ var createCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create an issue",
 	Example: "  jira8 issue create --summary \"Fix login\" --type Bug --priority High\n" +
-		"  jira8 issue create --type Bug --summary \"Crash\" --markdown --description-file bug.md   # its images are attached",
+		"  jira8 issue create --type Bug --summary \"Crash\" --markdown --description-file bug.md   # its images are attached\n" +
+		"  jira8 issue create --type Story --summary \"Export\" --labels backend,api --field \"Story Points=5\" --field \"Component/s=core\"",
 	RunE: runCreate,
 }
 
@@ -31,6 +32,7 @@ func init() {
 	createCmd.Flags().String("epic-link", "", "Epic key to associate this issue with (e.g. ABC-42)")
 	createCmd.Flags().Bool("markdown", false, "Treat --description as Markdown and convert it to Jira Wiki Markup; local images (![alt](path)) are attached to the issue")
 	createCmd.Flags().StringArray("attach", nil, "Attach a file (repeatable, e.g. --attach a.png --attach b.log)")
+	app.AddFieldFlags(createCmd)
 
 	_ = createCmd.MarkFlagRequired("summary")
 }
@@ -88,12 +90,16 @@ func runCreate(cmd *cobra.Command, args []string) error {
 		req.Fields.Parent = &models.IssueKeyRef{Key: parent}
 	}
 
+	req.Fields.Extra, err = app.CreateFields(cmd, project, issueType)
+	if err != nil {
+		return err
+	}
+
 	if epicName != "" || epicLink != "" {
 		epicNameID, epicLinkID, err := a.EpicFieldIDs(context.Background())
 		if err != nil {
 			return err
 		}
-		req.Fields.Extra = map[string]any{}
 		if epicName != "" {
 			req.Fields.Extra[epicNameID] = epicName
 		}
