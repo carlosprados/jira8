@@ -7,7 +7,6 @@ import (
 	"slices"
 
 	"github.com/amplia/jira8/cmd/app"
-	"github.com/amplia/jira8/internal/markup"
 	"github.com/amplia/jira8/internal/models"
 	"github.com/spf13/cobra"
 )
@@ -27,7 +26,7 @@ func init() {
 	editCmd.Flags().String("description-file", "", "Read new description from file (use - for stdin)")
 	editCmd.Flags().String("assignee", "", "New assignee (use 'me' for current user, empty to unassign)")
 	editCmd.Flags().String("priority", "", "New priority")
-	editCmd.Flags().Bool("markdown", false, "Treat --description as Markdown and convert to Jira Wiki Markup before sending")
+	editCmd.Flags().Bool("markdown", false, "Treat --description as Markdown and convert it to Jira Wiki Markup; local images (![alt](path)) are attached to the issue")
 }
 
 func runEdit(cmd *cobra.Command, args []string) error {
@@ -49,13 +48,12 @@ func runEdit(cmd *cobra.Command, args []string) error {
 		v, _ := cmd.Flags().GetString("summary")
 		fields["summary"] = v
 	}
-	if v, set, err := app.ReadTextInput(cmd, "description", "description-file"); err != nil {
+	body, err := app.ReadBody(cmd, "description", "description-file")
+	if err != nil {
 		return err
-	} else if set {
-		if md, _ := cmd.Flags().GetBool("markdown"); md {
-			v = markup.MarkdownToWiki(v)
-		}
-		fields["description"] = v
+	}
+	if body.Set {
+		fields["description"] = body.Text
 	}
 	if cmd.Flags().Changed("assignee") {
 		v, _ := cmd.Flags().GetString("assignee")
@@ -78,9 +76,23 @@ func runEdit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("no fields to update; use --name, --summary, --description, --assignee or --priority")
 	}
 
+	uploaded, err := app.UploadImages(context.Background(), key, body.Images)
+	if err != nil {
+		return err
+	}
 	req := &models.EditIssueRequest{Fields: fields}
 	if err := a.Client.EditIssue(context.Background(), key, req); err != nil {
 		return err
 	}
-	return app.Done(map[string]any{"key": key, "updated": slices.Sorted(maps.Keys(fields))}, "Updated Epic %s", key)
+	out := map[string]any{"key": key, "updated": slices.Sorted(maps.Keys(fields))}
+	if len(uploaded) > 0 {
+		out["attachments"] = uploaded
+	}
+	if err := app.Done(out, "Updated Epic %s", key); err != nil {
+		return err
+	}
+	if a.Output != "json" {
+		app.PrintUploadedImages(uploaded)
+	}
+	return nil
 }

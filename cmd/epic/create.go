@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/amplia/jira8/cmd/app"
-	"github.com/amplia/jira8/internal/markup"
 	"github.com/amplia/jira8/internal/models"
 	"github.com/spf13/cobra"
 )
@@ -25,7 +24,7 @@ func init() {
 	createCmd.Flags().String("description-file", "", "Read description from file (use - for stdin)")
 	createCmd.Flags().String("assignee", "", "Assignee username (use 'me' for current user)")
 	createCmd.Flags().String("priority", "", "Priority name")
-	createCmd.Flags().Bool("markdown", false, "Treat --description as Markdown and convert to Jira Wiki Markup before sending")
+	createCmd.Flags().Bool("markdown", false, "Treat --description as Markdown and convert it to Jira Wiki Markup; local images (![alt](path)) are attached to the issue")
 
 	_ = createCmd.MarkFlagRequired("name")
 	_ = createCmd.MarkFlagRequired("summary")
@@ -40,13 +39,11 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	description, _, err := app.ReadTextInput(cmd, "description", "description-file")
+	body, err := app.ReadBody(cmd, "description", "description-file")
 	if err != nil {
 		return err
 	}
-	if md, _ := cmd.Flags().GetBool("markdown"); md {
-		description = markup.MarkdownToWiki(description)
-	}
+	description := body.Text
 	assignee, _ := cmd.Flags().GetString("assignee")
 	priority, _ := cmd.Flags().GetString("priority")
 
@@ -82,10 +79,19 @@ func runCreate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	uploaded, err := app.UploadImages(context.Background(), resp.Key, body.Images)
+	if err != nil {
+		return fmt.Errorf("created %s but failed to upload its images: %w", resp.Key, err)
+	}
+
 	if a.Output == "json" {
-		return app.OutputJSON(resp)
+		return app.OutputJSON(struct {
+			*models.CreateIssueResponse
+			Attachments []models.Attachment `json:"attachments,omitempty"`
+		}{resp, uploaded})
 	}
 
 	fmt.Printf("Created Epic %s\n", resp.Key)
+	app.PrintUploadedImages(uploaded)
 	return nil
 }

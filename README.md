@@ -317,6 +317,19 @@ effect markers inside inline code, which Jira otherwise renders even within
 `{{…}}`. A list nested under a numbered one becomes `#*`. Write `[~username]`
 to mention someone; `@username` is not converted.
 
+Local images in the Markdown are uploaded as attachments and referenced as
+`!name.png|alt=…!`, so they render in Jira (and read back as `![alt](name.png)`):
+
+```bash
+# bug.md contains ![trace](shots/trace.png): shots/trace.png is attached to the issue
+jira8 issue create --type Bug --summary "Crash on save" --markdown --description-file bug.md
+```
+
+Relative paths resolve against the Markdown file (or the working directory for
+inline text and stdin). Missing files and two different files sharing a name
+are reported before anything is written; re-sending the same description does
+not attach the same image twice. Image URLs are linked, not uploaded.
+
 ## Agent skill
 
 The binary embeds a skill document (`SKILL.md`) that teaches a coding agent how

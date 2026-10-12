@@ -7,7 +7,6 @@ import (
 	"slices"
 
 	"github.com/amplia/jira8/cmd/app"
-	"github.com/amplia/jira8/internal/markup"
 	"github.com/amplia/jira8/internal/models"
 	"github.com/spf13/cobra"
 )
@@ -32,7 +31,7 @@ func init() {
 	editCmd.Flags().String("epic-link", "", "Epic key to associate this issue with (empty to detach)")
 	editCmd.Flags().String("due-date", "", "Due date, format YYYY-MM-DD (empty to clear)")
 	editCmd.Flags().String("original-estimate", "", "Original time estimate, e.g. 3d, 5h, 1h30m")
-	editCmd.Flags().Bool("markdown", false, "Treat --description as Markdown and convert to Jira Wiki Markup before sending")
+	editCmd.Flags().Bool("markdown", false, "Treat --description as Markdown and convert it to Jira Wiki Markup; local images (![alt](path)) are attached to the issue")
 	editCmd.Flags().StringArray("attach", nil, "Attach a file to the issue (repeatable). Can be used alone, without other field edits.")
 }
 
@@ -47,13 +46,12 @@ func runEdit(cmd *cobra.Command, args []string) error {
 		fields["summary"] = v
 	}
 
-	if v, set, err := app.ReadTextInput(cmd, "description", "description-file"); err != nil {
+	body, err := app.ReadBody(cmd, "description", "description-file")
+	if err != nil {
 		return err
-	} else if set {
-		if md, _ := cmd.Flags().GetBool("markdown"); md {
-			v = markup.MarkdownToWiki(v)
-		}
-		fields["description"] = v
+	}
+	if body.Set {
+		fields["description"] = body.Text
 	}
 
 	if cmd.Flags().Changed("assignee") {
@@ -119,6 +117,12 @@ func runEdit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("no fields to update; use --summary, --description, --assignee, --priority, --epic-name, --epic-link, --due-date, --original-estimate, or --attach")
 	}
 
+	// Images first, so the new description renders them as soon as it lands.
+	uploaded, err := app.UploadImages(context.Background(), key, body.Images)
+	if err != nil {
+		return err
+	}
+
 	if len(fields) > 0 {
 		req := &models.EditIssueRequest{Fields: fields}
 		if err := a.Client.EditIssue(context.Background(), key, req); err != nil {
@@ -126,13 +130,12 @@ func runEdit(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	var uploaded []models.Attachment
 	if len(attachFiles) > 0 {
-		var err error
-		uploaded, err = a.Client.AddAttachments(context.Background(), key, attachFiles)
+		attached, err := a.Client.AddAttachments(context.Background(), key, attachFiles)
 		if err != nil {
 			return fmt.Errorf("attaching files to %s: %w", key, err)
 		}
+		uploaded = append(uploaded, attached...)
 	}
 
 	if a.Output == "json" {

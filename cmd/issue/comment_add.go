@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/amplia/jira8/cmd/app"
-	"github.com/amplia/jira8/internal/markup"
 	"github.com/amplia/jira8/internal/models"
 	"github.com/spf13/cobra"
 )
@@ -22,26 +21,27 @@ var commentAddCmd = &cobra.Command{
 func init() {
 	commentAddCmd.Flags().String("body", "", "Comment body (required, or use --body-file)")
 	commentAddCmd.Flags().String("body-file", "", "Read body from file (use - for stdin)")
-	commentAddCmd.Flags().Bool("markdown", false, "Treat --body as Markdown and convert to Jira Wiki Markup before sending")
+	commentAddCmd.Flags().Bool("markdown", false, "Treat --body as Markdown and convert it to Jira Wiki Markup; local images (![alt](path)) are attached to the issue")
 }
 
 func runCommentAdd(cmd *cobra.Command, args []string) error {
 	a := app.Get()
 	key := args[0]
 
-	body, set, err := app.ReadTextInput(cmd, "body", "body-file")
+	body, err := app.ReadBody(cmd, "body", "body-file")
 	if err != nil {
 		return err
 	}
-	if !set || body == "" {
+	if !body.Set || body.Text == "" {
 		return fmt.Errorf("comment body is required (use --body or --body-file)")
 	}
-	if md, _ := cmd.Flags().GetBool("markdown"); md {
-		body = markup.MarkdownToWiki(body)
+	uploaded, err := app.UploadImages(context.Background(), key, body.Images)
+	if err != nil {
+		return err
 	}
 
 	comment, err := a.Client.AddComment(context.Background(), key, &models.AddCommentRequest{
-		Body: body,
+		Body: body.Text,
 	})
 	if err != nil {
 		return err
@@ -52,5 +52,6 @@ func runCommentAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("Comment added to %s by %s\n", key, userName(comment.Author))
+	app.PrintUploadedImages(uploaded)
 	return nil
 }

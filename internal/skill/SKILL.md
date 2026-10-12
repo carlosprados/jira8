@@ -6,7 +6,7 @@ description: Read and change issues in a Jira Server 8 / Data Center instance fr
 # jira8 — Jira Server 8 from the shell
 
 `jira8` talks to a Jira **Server/Data Center 8** instance (REST API v2) with the
-user's own credentials. Everything is a CLI subcommand; there is no MCP server.
+user's own credentials.
 
 ```sh
 jira8 --help · jira8 <group> <cmd> --help     # every command has examples
@@ -64,6 +64,7 @@ jira8 issue view ABC-123 -o json
 jira8 issue view ABC-123 --with-history -o json  # + changelog.histories[]
 jira8 issue comment-list ABC-123 -o json
 jira8 issue worklog-list ABC-123 -o json
+jira8 issue attachment list ABC-123 -o json      # id, filename, size, content URL
 jira8 epic view ABC-42 -o json                   # {epic, children} (--no-children to skip)
 jira8 epic children ABC-42 -o json
 ```
@@ -94,6 +95,16 @@ Writing converts headings, emphasis, code (inline and fenced, with language),
 quotes, nested and mixed lists, tables and links, and escapes what Jira would
 misread (`{…}`, `[…]`, braces inside inline code). To mention someone write
 `[~username]`: it is sent as is. `@username` is not converted.
+
+**Images**: with `--markdown`, a local image `![alt](shot.png)` is uploaded
+as an attachment of the issue and becomes `!shot.png|alt=alt!`, so it renders
+in Jira.
+Relative paths resolve against the Markdown file (`--description-file`,
+`--body-file`), or the working directory for inline text and stdin. Every file
+is checked before anything is written; two different files with the same name
+are an error. Re-sending the same text does not attach an image again (same
+name and size). Image URLs (`https://…`) are linked, not uploaded. JSON output
+of create/edit lists the uploads in `attachments[]`.
 
 Reading converts the same back, plus `{noformat}`, `[~user]` (→ `@user`) and
 images (→ attachment name, not a URL); `{color}`, `{panel}`, `{anchor}` are
@@ -158,7 +169,8 @@ is a transition). It needs Jira Software. When the project has several boards,
 ## Epics
 
 `epic list|view|children|create|edit` resolve the Epic Name / Epic Link custom
-fields by themselves; never hardcode `customfield_…` ids.
+fields by themselves; never hardcode `customfield_…` ids. Prefer
+`epic create` over `issue create --type Epic`, which also needs `--epic-name`.
 
 ```sh
 jira8 epic create --project ABC --name "Billing v2" --summary "Billing v2" --markdown --description-file epic.md
@@ -167,10 +179,15 @@ jira8 epic edit ABC-42 --name "Billing v2 (rev)"
 
 ## Destructive commands
 
-`comment-delete`, `worklog-delete` and `attachment delete` ask on a terminal.
-Without one (your case) they fail with exit 1 unless you pass `--yes`. Pass it
-only after the user confirmed that exact deletion: nothing deleted can be
-recovered.
+```sh
+jira8 issue comment-delete ABC-123 --id 84887 --yes
+jira8 issue worklog-delete ABC-123 --id 27705 --yes
+jira8 issue attachment delete 45821 --yes        # ids from the *-list commands
+```
+
+They ask on a terminal. Without one (your case) they fail with exit 1 unless
+you pass `--yes`. Pass it only after the user confirmed that exact deletion:
+nothing deleted can be recovered.
 
 ## Not possible with jira8
 
