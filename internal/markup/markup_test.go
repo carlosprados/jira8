@@ -1,6 +1,9 @@
 package markup
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestMarkdownToWiki(t *testing.T) {
 	cases := []struct {
@@ -383,5 +386,53 @@ func TestRoundTripInlineCode(t *testing.T) {
 		if got := WikiToMarkdown(MarkdownToWiki(md)); got != md {
 			t.Errorf("round trip:\n in:  %q\n got: %q", md, got)
 		}
+	}
+}
+
+func TestMarkdownImages(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"see ![diagram](img/flow_v2.png) here", "see !flow_v2.png|alt=diagram! here"},
+		{"![logo](https://x.io/a_b/l.png)", "!https://x.io/a_b/l.png|alt=logo!"},
+		{"![a](my%20shot.png)", "!my shot.png|alt=a!"},
+		{`![a](C:\shots\b.png)`, "!b.png|alt=a!"},
+		{"![a, b | c!](x.png)", "!x.png|alt=a b c!"},
+		{"![](a.png) and [link](https://x.io)", "!a.png! and [link|https://x.io]"},
+		{"`![not](an/image.png)`", "{{!&#91;not&#93;(an/image.png)}}"},
+	}
+	for _, c := range cases {
+		if got := MarkdownToWiki(c.in); got != c.want {
+			t.Errorf("MarkdownToWiki(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
+
+func TestLocalImages(t *testing.T) {
+	md := "![a](img/a.png) ![remote](https://x.io/r.png) ![a again](img/a.png)\n" +
+		"`![in code](no.png)`\n```\n![fenced](no2.png)\n```\n![b](my%20b.png)"
+	got := LocalImages(md)
+	want := []string{"img/a.png", "my b.png"}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Errorf("LocalImages = %q, want %q", got, want)
+	}
+}
+
+func TestImageRoundTrip(t *testing.T) {
+	for _, md := range []string{"![stack trace](trace.png)", "![](trace.png)", "![s](my%20shot.png)"} {
+		want := md
+		if md == "![](trace.png)" {
+			want = "![trace.png](trace.png)"
+		}
+		if got := WikiToMarkdown(MarkdownToWiki(md)); got != want {
+			t.Errorf("round trip %q: got %q, want %q", md, got, want)
+		}
+	}
+	if got := WikiToMarkdown("!my shot.png|alt=s!"); got != "![s](my%20shot.png)" {
+		t.Errorf("spaced name: got %q", got)
+	}
+	if got := WikiToMarkdown("Wow! great! and !a.png!"); got != "Wow! great! and ![a.png](a.png)" {
+		t.Errorf("exclamations in prose: got %q", got)
+	}
+	if got := WikiToMarkdown("!a.png|thumbnail, alt=x y!"); got != "![x y](a.png)" {
+		t.Errorf("alt among params: got %q", got)
 	}
 }

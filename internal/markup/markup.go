@@ -16,6 +16,8 @@ package markup
 import (
 	"fmt"
 	"html"
+	"net/url"
+	"path"
 	"regexp"
 	"strconv"
 	"strings"
@@ -164,6 +166,7 @@ var (
 	strikeRe      = regexp.MustCompile(`~~([^~\n]+)~~`)
 	linkRe        = regexp.MustCompile(`\[([^\]]+)\]\(([^)\s]+)\)`)
 	mentionRe     = regexp.MustCompile(`\[~[^\]\s]+\]`)
+	imageRe       = regexp.MustCompile(`!\[([^\]]*)\]\(([^)\s]+)\)`)
 
 	codePlaceholderRe = regexp.MustCompile(`\x00C(\d+)\x00`)
 	boldPlaceholderRe = regexp.MustCompile(`\x00B(\d+)\x00`)
@@ -193,6 +196,10 @@ func transformInline(s string) string {
 		links = append(links, m)
 		return fmt.Sprintf("\x00L%d\x00", len(links)-1)
 	}
+	s = imageRe.ReplaceAllStringFunc(s, func(m string) string {
+		sub := imageRe.FindStringSubmatch(m)
+		return park("!" + ImageName(sub[2]) + imageAlt(sub[1]) + "!")
+	})
 	s = linkRe.ReplaceAllStringFunc(s, park)
 	s = mentionRe.ReplaceAllStringFunc(s, park)
 	s = escapeBrackets(s)
@@ -244,6 +251,66 @@ func closesEffect(rs []rune, marker rune) bool {
 		}
 	}
 	return false
+}
+
+// ImageName is what a Markdown image source becomes in Wiki Markup: a URL is
+// kept, a local path becomes its file name, which is how Jira refers to an
+// attachment of the issue.
+func ImageName(src string) string {
+	if IsRemoteImage(src) {
+		return src
+	}
+	if u, err := url.PathUnescape(src); err == nil {
+		src = u
+	}
+	return path.Base(strings.ReplaceAll(src, `\`, "/"))
+}
+
+// imageAlt renders Markdown alt text as a Wiki image parameter. Jira splits
+// parameters on commas and ends the image at "|" or "!", so those go.
+func imageAlt(alt string) string {
+	alt = strings.Join(strings.Fields(strings.NewReplacer(",", " ", "|", " ", "!", " ").Replace(alt)), " ")
+	if alt == "" {
+		return ""
+	}
+	return "|alt=" + alt
+}
+
+// IsRemoteImage reports whether an image source is a URL rather than a file.
+func IsRemoteImage(src string) bool {
+	return strings.HasPrefix(src, "http://") || strings.HasPrefix(src, "https://") || strings.HasPrefix(src, "data:")
+}
+
+// LocalImages returns the local image paths referenced by Markdown, in order
+// and without duplicates. Images inside code (fenced or inline) do not count.
+func LocalImages(md string) []string {
+	var out []string
+	seen := map[string]bool{}
+	inFence := false
+	for _, line := range strings.Split(md, "\n") {
+		if fenceLineRe.MatchString(line) {
+			inFence = !inFence
+			continue
+		}
+		if inFence {
+			continue
+		}
+		line = inlineCodeRe.ReplaceAllString(line, "")
+		for _, m := range imageRe.FindAllStringSubmatch(line, -1) {
+			src := m[2]
+			if IsRemoteImage(src) {
+				continue
+			}
+			if u, err := url.PathUnescape(src); err == nil {
+				src = u
+			}
+			if !seen[src] {
+				seen[src] = true
+				out = append(out, src)
+			}
+		}
+	}
+	return out
 }
 
 // escapeBrackets backslash-escapes braces and brackets in prose: to Jira a
@@ -562,7 +629,8 @@ var (
 	wikiItalicRe   = regexp.MustCompile(`(^|[^\w_])_([^_\n]+)_([^\w_]|$)`)
 	wikiStrikeRe   = regexp.MustCompile(`(^|[^\w-])-(\S[^-\n]*\S|\S)-([^\w-]|$)`)
 	wikiLinkRe     = regexp.MustCompile(`\[([^\]|\n]+)\|([^\]\n]+)\]`)
-	wikiImageRe    = regexp.MustCompile(`!([^!\s|]+)(?:\|[^!\n]*)?!`)
+	wikiImageRe    = regexp.MustCompile(`!([^!\s|](?:[^!|\n]*[^!\s|])?)(?:\|([^!\n]*))?!`)
+	wikiImageAltRe = regexp.MustCompile(`(?:^|,)\s*alt=([^,]*)`)
 	wikiMentionRe  = regexp.MustCompile(`\[~([^\]\s]+)\]`)
 	wikiBareURLRe  = regexp.MustCompile(`\[(https?://[^\]\s|]+)\]`)
 	wikiIssueRefRe = regexp.MustCompile(`\[([A-Z][A-Z0-9_]+-\d+)\]`)
@@ -609,8 +677,12 @@ func transformInlineWiki(s string) string {
 		return keep("[" + sub[1] + "](" + sub[2] + ")")
 	})
 	s = wikiImageRe.ReplaceAllStringFunc(s, func(m string) string {
-		name := wikiImageRe.FindStringSubmatch(m)[1]
-		return keep("![" + name + "](" + name + ")")
+		sub := wikiImageRe.FindStringSubmatch(m)
+		alt := sub[1]
+		if a := wikiImageAltRe.FindStringSubmatch(sub[2]); a != nil && strings.TrimSpace(a[1]) != "" {
+			alt = strings.NewReplacer("[", "", "]", "").Replace(strings.TrimSpace(a[1]))
+		}
+		return keep("![" + alt + "](" + strings.ReplaceAll(sub[1], " ", "%20") + ")")
 	})
 
 	var bolds []string

@@ -6,16 +6,16 @@ import (
 	"strings"
 
 	"github.com/amplia/jira8/cmd/app"
-	"github.com/amplia/jira8/internal/markup"
 	"github.com/amplia/jira8/internal/models"
 	"github.com/spf13/cobra"
 )
 
 var createCmd = &cobra.Command{
-	Use:     "create",
-	Short:   "Create an issue",
-	Example: "  jira8 issue create --summary \"Fix login\" --type Bug --priority High",
-	RunE:    runCreate,
+	Use:   "create",
+	Short: "Create an issue",
+	Example: "  jira8 issue create --summary \"Fix login\" --type Bug --priority High\n" +
+		"  jira8 issue create --type Bug --summary \"Crash\" --markdown --description-file bug.md   # its images are attached",
+	RunE: runCreate,
 }
 
 func init() {
@@ -29,7 +29,7 @@ func init() {
 	createCmd.Flags().String("parent", "", "Parent issue key for Sub-task creation (e.g. ABC-65)")
 	createCmd.Flags().String("epic-name", "", "Epic Name (required when --type Epic)")
 	createCmd.Flags().String("epic-link", "", "Epic key to associate this issue with (e.g. ABC-42)")
-	createCmd.Flags().Bool("markdown", false, "Treat --description as Markdown and convert to Jira Wiki Markup before sending")
+	createCmd.Flags().Bool("markdown", false, "Treat --description as Markdown and convert it to Jira Wiki Markup; local images (![alt](path)) are attached to the issue")
 	createCmd.Flags().StringArray("attach", nil, "Attach a file (repeatable, e.g. --attach a.png --attach b.log)")
 
 	_ = createCmd.MarkFlagRequired("summary")
@@ -44,13 +44,11 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	description, _, err := app.ReadTextInput(cmd, "description", "description-file")
+	body, err := app.ReadBody(cmd, "description", "description-file")
 	if err != nil {
 		return err
 	}
-	if md, _ := cmd.Flags().GetBool("markdown"); md {
-		description = markup.MarkdownToWiki(description)
-	}
+	description := body.Text
 	assignee, _ := cmd.Flags().GetString("assignee")
 	priority, _ := cmd.Flags().GetString("priority")
 	parent, _ := cmd.Flags().GetString("parent")
@@ -109,17 +107,21 @@ func runCreate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Attachments are uploaded after creation because Jira's /issue endpoint
-	// does not accept multipart bodies. The two calls are not transactional:
-	// if the upload fails the issue already exists, so we report both the
-	// created key and the upload error.
+	// Attachments and Markdown images are uploaded after creation because
+	// Jira's /issue endpoint does not accept multipart bodies. The calls are
+	// not transactional: if an upload fails the issue already exists, so we
+	// report both the created key and the upload error.
+	uploaded, err := app.UploadImages(context.Background(), resp.Key, body.Images)
+	if err != nil {
+		return fmt.Errorf("created %s but failed to upload its images: %w", resp.Key, err)
+	}
 	attachFiles, _ := cmd.Flags().GetStringArray("attach")
-	var uploaded []models.Attachment
 	if len(attachFiles) > 0 {
-		uploaded, err = a.Client.AddAttachments(context.Background(), resp.Key, attachFiles)
+		attached, err := a.Client.AddAttachments(context.Background(), resp.Key, attachFiles)
 		if err != nil {
 			return fmt.Errorf("created %s but failed to upload attachments: %w", resp.Key, err)
 		}
+		uploaded = append(uploaded, attached...)
 	}
 
 	if a.Output == "json" {

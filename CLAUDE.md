@@ -15,7 +15,7 @@ Requires a `~/.jira.yaml` with `url` and either `token` or `user` + `password` (
 
 ## Architecture
 
-This is a Go CLI tool targeting **Jira Server 8.7.1 REST API v2** (`https://jira.amplia.es/jira`), plus the Agile API (`/rest/agile/1.0`) for board ranking only. It is a CLI only: agents drive it from the shell, guided by the embedded skill (`internal/skill/SKILL.md`). The MCP server was removed in v2.0.0.
+This is a Go CLI tool targeting **Jira Server 8.7.1 REST API v2**, plus the Agile API (`/rest/agile/1.0`) for board ranking only. It is a CLI only, by design: agents drive it from the shell, guided by the embedded skill (`internal/skill/SKILL.md`).
 
 ### Key layers
 
@@ -39,16 +39,22 @@ This is a Go CLI tool targeting **Jira Server 8.7.1 REST API v2** (`https://jira
 
 ## Development rules
 
-### Keep the skill in step with the CLI (mandatory)
+### Doctrine: the CLI and the skill are twins
 
 `internal/skill/SKILL.md` is what agents read instead of `--help`. A command,
-flag or behaviour that agents should use but the skill does not mention is, for
-them, missing.
+flag or behaviour the skill does not mention does not exist for them, and a
+command it shows that no longer runs misleads them. So:
 
-- When adding or changing a subcommand, flag, JSON shape or limitation, update
-  `SKILL.md` in the same commit/PR.
-- Every command the skill shows must run as written: check its flags against
-  `jira8 <cmd> --help`.
+- **Every change to the CLI updates `SKILL.md` in the same commit**: new or
+  renamed commands and flags, JSON shapes, formats, errors, limitations. No
+  exceptions, no "docs later".
+- `go test ./cmd/` enforces it (`cmd/skill_doctrine_test.go`): every command
+  and flag must appear in the skill, and every `jira8 …` line in the skill must
+  parse against the real command tree. A deliberate omission goes in
+  `notForAgents` with its reason; keep that list short.
+- The test cannot judge meaning: when behaviour changes, reread the affected
+  skill section and fix it by hand, then run the commands for real against a
+  test project.
 - Keep it short and generic (no instance URLs, project keys or people): it is
   public and installed on other people's machines.
 
