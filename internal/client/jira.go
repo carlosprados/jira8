@@ -318,6 +318,42 @@ func (c *Client) LinkIssues(ctx context.Context, req *models.IssueLinkRequest) e
 	return err
 }
 
+// GetIssueLinks returns the links of an issue (fields.issuelinks).
+func (c *Client) GetIssueLinks(ctx context.Context, key string) ([]models.IssueLink, error) {
+	data, err := c.do(ctx, http.MethodGet, "/issue/"+url.PathEscape(key)+"?fields=issuelinks", nil)
+	if err != nil {
+		return nil, err
+	}
+	var resp struct {
+		Fields struct {
+			IssueLinks []models.IssueLink `json:"issuelinks"`
+		} `json:"fields"`
+	}
+	if err := json.Unmarshal(data, &resp); err != nil {
+		return nil, fmt.Errorf("parsing issue links: %w", err)
+	}
+	return resp.Fields.IssueLinks, nil
+}
+
+// GetIssueLink returns one link by id, with both issues.
+func (c *Client) GetIssueLink(ctx context.Context, id string) (*models.IssueLink, error) {
+	data, err := c.do(ctx, http.MethodGet, "/issueLink/"+url.PathEscape(id), nil)
+	if err != nil {
+		return nil, err
+	}
+	var link models.IssueLink
+	if err := json.Unmarshal(data, &link); err != nil {
+		return nil, fmt.Errorf("parsing issue link: %w", err)
+	}
+	return &link, nil
+}
+
+// DeleteIssueLink removes a link by id.
+func (c *Client) DeleteIssueLink(ctx context.Context, id string) error {
+	_, err := c.do(ctx, http.MethodDelete, "/issueLink/"+url.PathEscape(id), nil)
+	return err
+}
+
 // AddWorklog adds a worklog entry to an issue.
 func (c *Client) AddWorklog(ctx context.Context, key string, req *models.AddWorklogRequest) (*models.Worklog, error) {
 	data, err := c.do(ctx, http.MethodPost, "/issue/"+url.PathEscape(key)+"/worklog", req)

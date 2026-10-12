@@ -33,6 +33,7 @@ is coloured and may change. Every Jira command honours `-o json`, writes include
 | `issue edit`, `epic edit` | `{key, updated: [field ids]}` (+ `attachments[]`) |
 | `transition` | `{key, transition, status}` (+ `updated`, `comment` id, `attachments[]`) |
 | `link` | `{outward, type, inward}` |
+| `issue links` | array of `{id, type, direction, phrase, key, summary, status}`, seen from that issue |
 | `user search`, `user me` | array / one `{name, key, displayName, emailAddress, active}` |
 | `project fields`, `issue fields` | array of `{id, name, required, type, items?, custom?, operations?, allowed?}` |
 | `*-delete`, `attachment delete` | `{…, id, deleted: true}` |
@@ -77,10 +78,14 @@ jira8 issue view ABC-123 --with-history -o json  # + changelog.histories[]
 jira8 issue comment-list ABC-123 -o json
 jira8 issue worklog-list ABC-123 -o json
 jira8 issue attachment list ABC-123 -o json      # id, filename, size, content URL
+jira8 issue links ABC-123 -o json                # "blocks ABC-9", "is blocked by ABC-7"…
 jira8 epic view ABC-42 -o json                   # {epic, children} (--no-children to skip)
 jira8 epic children ABC-42 -o json
 ```
 
+- `issue links` reads each link from the issue's side: `phrase` is what this
+  issue does to `key` (`direction: outward`) or suffers from it (`inward`).
+  `link-delete` answers which link it removed: `{id, outward, type, inward, deleted}`.
 - `--jql` overrides every other filter of `issue list`. `--max` defaults to 50.
   Without `--project` and without a configured project, `issue list` searches
   every project.
@@ -246,6 +251,7 @@ jira8 epic edit ABC-42 --name "Billing v2 (rev)"
 jira8 issue comment-delete ABC-123 --id 84887 --yes
 jira8 issue worklog-delete ABC-123 --id 27705 --yes
 jira8 issue attachment delete 45821 --yes        # ids from the *-list commands
+jira8 issue link-delete 55539 --yes              # id from issue links
 ```
 
 They ask on a terminal. Without one (your case) they fail with exit 1 unless

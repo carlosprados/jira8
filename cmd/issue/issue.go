@@ -28,4 +28,6 @@ func init() {
 	IssueCmd.AddCommand(attachmentCmd)
 	IssueCmd.AddCommand(linkCmd)
 	IssueCmd.AddCommand(linkTypesCmd)
+	IssueCmd.AddCommand(linksCmd)
+	IssueCmd.AddCommand(linkDeleteCmd)
 }
