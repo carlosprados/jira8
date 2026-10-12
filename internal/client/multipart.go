@@ -33,6 +33,9 @@ func (c *Client) doMultipartUpload(ctx context.Context, path string, files []str
 			return nil, fmt.Errorf("attachment %q is a directory", p)
 		}
 	}
+	if c.dryRun {
+		return c.plan(http.MethodPost, apiBasePath+path, nil, files), nil
+	}
 
 	pr, pw := io.Pipe()
 	mw := multipart.NewWriter(pw)

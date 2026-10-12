@@ -78,6 +78,9 @@ type Client struct {
 	// total-request timeout so large files on slow links are not aborted
 	// after the global 15s; callers must supply a context to bound the call.
 	uploadClient *http.Client
+
+	dryRun  bool
+	planned []PlannedRequest
 }
 
 // New creates a new Jira API client from config.
@@ -111,6 +114,9 @@ func (c *Client) doAgile(ctx context.Context, method, path string, body any) ([]
 // doAt executes an HTTP request against an absolute API path (base included)
 // with auth, retries, and error handling.
 func (c *Client) doAt(ctx context.Context, method, apiPath string, body any) ([]byte, error) {
+	if c.dryRun && method != http.MethodGet {
+		return c.plan(method, apiPath, body, nil), nil
+	}
 	var bodyBytes []byte
 	if body != nil {
 		data, err := json.Marshal(body)
