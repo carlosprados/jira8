@@ -31,7 +31,7 @@ is coloured and may change. Every Jira command honours `-o json`, writes include
 | `issue create`, `epic create` | `{id, key, self}` (+ `attachments[]`) |
 | `comment-add`, `comment-edit`, `worklog-add`, `attachment add` | the created object(s), with their `id` |
 | `issue edit`, `epic edit` | `{key, updated: [field ids]}` (+ `attachments[]`) |
-| `transition` | `{key, transition, status}` |
+| `transition` | `{key, transition, status}` (+ `updated`, `comment` id, `attachments[]`) |
 | `link` | `{outward, type, inward}` |
 | `user search`, `user me` | array / one `{name, key, displayName, emailAddress, active}` |
 | `project fields`, `issue fields` | array of `{id, name, required, type, items?, custom?, operations?, allowed?}` |
@@ -52,7 +52,7 @@ Never guess names: Jira rejects unknown values and each project differs.
 jira8 project types --project ABC -o json        # issue types; subtask:true needs --parent
 jira8 project statuses --project ABC -o json     # statuses per issue type
 jira8 project priorities -o json
-jira8 issue transitions ABC-123 -o json          # transitions valid NOW for this issue
+jira8 issue transitions ABC-123 -o json          # transitions valid NOW, with the fields their screens ask
 jira8 issue link-types -o json
 jira8 project fields --project ABC --type Bug -o json   # fields on the create screen + allowed values
 jira8 issue fields ABC-123 -o json               # fields you can edit on this issue
@@ -140,6 +140,7 @@ jira8 issue edit ABC-123 --assignee me --priority Critical
 jira8 issue edit ABC-123 --assignee ""           # unassign ("" clears: also --epic-link, --due-date)
 jira8 issue edit ABC-123 --due-date 2026-11-30 --original-estimate 3d
 jira8 issue transition ABC-123 --to "In Progress"
+jira8 issue transition ABC-123 --to Done --field "Resolution=Fixed" --markdown --comment "…"
 jira8 issue comment-add ABC-123 --markdown --body "…"
 jira8 issue comment-edit ABC-123 --id 84887 --markdown --body "…"
 jira8 issue worklog-add ABC-123 --time 1h30m --date 2026-10-09 --comment "…"
@@ -158,8 +159,12 @@ jira8 issue attachment add ABC-123 a.png b.log
   (local) or RFC 3339. Default: now.
 - `transition --to` takes the **transition** name shown by `issue transitions`,
   which is not always the target status name. On a miss, the error lists the
-  valid ones. A transition cannot set a resolution or add a comment: add the
-  comment with `comment-add`.
+  valid ones. Some transitions have a screen (`fields` in `issue
+  transitions`), typically a required Resolution on Done: pass it with
+  `--field "Resolution=…"`; a missing required field fails before anything
+  is sent and lists the allowed values. `--field` on a transition without a
+  screen is an error: use `issue edit`. `--comment`/`--comment-file` (with
+  `--markdown`) add a comment right after the transition.
 - `issue create` uploads attachments after creating the issue. If the upload
   fails, the issue still exists: the error gives its key, retry with
   `issue attachment add`.
@@ -229,7 +234,6 @@ nothing deleted can be recovered.
 Say so instead of improvising with the REST API:
 
 - sprints, watchers and votes;
-- a resolution or a screen on a transition;
 - deleting, cloning or moving issues to another project (Jira Server 8 has no
   REST endpoint to move; it is done in the web UI);
 - filters, dashboards, boards configuration, admin settings.

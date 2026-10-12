@@ -245,6 +245,8 @@ type Transition struct {
 	ID   string  `json:"id"`
 	Name string  `json:"name"`
 	To   *Status `json:"to"`
+	// Fields is the transition screen; empty when the transition has none.
+	Fields map[string]FieldMeta `json:"fields,omitempty"`
 }
 
 // CreateIssueRequest is the POST body for /rest/api/2/issue.
@@ -346,7 +348,8 @@ type EditIssueRequest struct {
 
 // TransitionRequest is the POST body for /rest/api/2/issue/{key}/transitions.
 type TransitionRequest struct {
-	Transition TransitionRef `json:"transition"`
+	Transition TransitionRef  `json:"transition"`
+	Fields     map[string]any `json:"fields,omitempty"`
 }
 
 // TransitionRef references a transition by ID.

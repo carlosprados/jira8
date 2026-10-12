@@ -192,7 +192,14 @@ jira8 epic edit MYPROJ-42 --summary "New summary" --assignee me
 ```bash
 jira8 issue transitions MYPROJ-123               # list available transitions
 jira8 issue transition MYPROJ-123 --to "Done"    # perform transition
+jira8 issue transition MYPROJ-123 --to "Done" --field "Resolution=Won't Fix" --comment "Duplicate of MYPROJ-99"
 ```
+
+`issue transitions` shows the fields each transition's screen asks for. Pass
+them with `--field` (same rules as `issue edit --field`); a required one left
+out fails before anything is sent. `--comment` (or `--comment-file`, with
+`--markdown`) is added right after the transition: Jira silently drops a
+comment sent inside a transition that has no screen, so jira8 never does that.
 
 ### Ranking (kanban order)
 
