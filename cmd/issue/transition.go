@@ -3,6 +3,8 @@ package issue
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 
 	"github.com/amplia/jira8/cmd/app"
@@ -11,11 +13,13 @@ import (
 )
 
 var transitionCmd = &cobra.Command{
-	Use:     "transition ISSUE-KEY",
-	Short:   "Transition an issue to a new status",
-	Example: "  jira8 issue transition ABC-123 --to \"Done\"",
-	Args:    cobra.ExactArgs(1),
-	RunE:    runTransition,
+	Use:   "transition ISSUE-KEY",
+	Short: "Transition an issue to a new status",
+	Example: `  jira8 issue transition ABC-123 --to "Done"
+  jira8 issue transition ABC-123 --to "Done" --field "Resolution=Won't Fix" --comment "Duplicate of ABC-99"
+  jira8 issue transitions ABC-123        # which transitions exist now and what their screens ask`,
+	Args: cobra.ExactArgs(1),
+	RunE: runTransition,
 }
 
 var transitionsCmd = &cobra.Command{
@@ -28,6 +32,10 @@ var transitionsCmd = &cobra.Command{
 
 func init() {
 	transitionCmd.Flags().String("to", "", "Target transition name (required)")
+	transitionCmd.Flags().StringArray("field", nil, `Set a field on the transition screen, e.g. "Resolution=Fixed" (repeatable; see 'issue transitions')`)
+	transitionCmd.Flags().String("comment", "", "Add a comment after the transition")
+	transitionCmd.Flags().String("comment-file", "", "Read the comment from file (use - for stdin)")
+	transitionCmd.Flags().Bool("markdown", false, "Treat --comment as Markdown and convert it to Jira Wiki Markup; local images (![alt](path)) are attached to the issue")
 	_ = transitionCmd.MarkFlagRequired("to")
 }
 
@@ -47,9 +55,20 @@ func runTransition(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("transition %q not found; available: %s", to, strings.Join(app.Names(transitions, transitionName), ", "))
 	}
 
-	req := &models.TransitionRequest{
-		Transition: models.TransitionRef{ID: match.ID},
+	fields, err := transitionFields(cmd, match)
+	if err != nil {
+		return err
 	}
+	comment, err := app.ReadBody(cmd, "comment", "comment-file")
+	if err != nil {
+		return err
+	}
+	uploaded, err := app.UploadImages(context.Background(), key, comment.Images)
+	if err != nil {
+		return err
+	}
+
+	req := &models.TransitionRequest{Transition: models.TransitionRef{ID: match.ID}, Fields: fields}
 	if err := a.Client.DoTransition(context.Background(), key, req); err != nil {
 		return err
 	}
@@ -58,8 +77,56 @@ func runTransition(cmd *cobra.Command, args []string) error {
 	if match.To != nil {
 		target = match.To.Name
 	}
-	return app.Done(map[string]string{"key": key, "transition": match.Name, "status": target},
-		"Transitioned %s → %s", key, target)
+	out := map[string]any{"key": key, "transition": match.Name, "status": target}
+	if len(fields) > 0 {
+		out["updated"] = app.UpdatedFields(fields, nil)
+	}
+	if len(uploaded) > 0 {
+		out["attachments"] = uploaded
+	}
+	// Sent apart: Jira silently drops a comment inside a transition that has
+	// no screen, and a separate call also gives back the comment id.
+	if comment.Set && comment.Text != "" {
+		c, err := a.Client.AddComment(context.Background(), key, &models.AddCommentRequest{Body: comment.Text})
+		if err != nil {
+			return fmt.Errorf("transitioned %s to %s but failed to add the comment: %w", key, target, err)
+		}
+		out["comment"] = c.ID
+	}
+	if err := app.Done(out, "Transitioned %s → %s", key, target); err != nil {
+		return err
+	}
+	if a.Output != "json" {
+		app.PrintUploadedImages(uploaded)
+	}
+	return nil
+}
+
+// transitionFields resolves --field against the transition screen and checks
+// that every required field of that screen is given, before anything is sent.
+func transitionFields(cmd *cobra.Command, t *models.Transition) (map[string]any, error) {
+	var fields map[string]any
+	if cmd.Flags().Changed("field") {
+		if len(t.Fields) == 0 {
+			return nil, fmt.Errorf("transition %q has no screen: it takes no --field (use 'issue edit' before or after)", t.Name)
+		}
+		var err error
+		if fields, err = app.FieldValues(context.Background(), cmd, t.Fields); err != nil {
+			return nil, err
+		}
+	}
+	for _, id := range slices.Sorted(maps.Keys(t.Fields)) {
+		f := t.Fields[id]
+		if _, ok := fields[id]; ok || !f.Required {
+			continue
+		}
+		hint := ""
+		if len(f.AllowedValues) > 0 {
+			hint = "; allowed: " + strings.Join(app.Names(f.AllowedValues, models.AllowedValue.Label), ", ")
+		}
+		return nil, fmt.Errorf("transition %q requires %s: pass --field \"%s=…\"%s", t.Name, f.Name, f.Name, hint)
+	}
+	return fields, nil
 }
 
 func runTransitions(cmd *cobra.Command, args []string) error {

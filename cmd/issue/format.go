@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/amplia/jira8/cmd/app"
 	"github.com/amplia/jira8/internal/models"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -254,6 +255,17 @@ func printTransitions(transitions []models.Transition) {
 			target = t.To.Name
 		}
 		fmt.Printf("%-6s  %-25s  %s\n", t.ID, t.Name, target)
+		for _, r := range app.FieldRows(t.Fields) {
+			req := "optional"
+			if r.Required {
+				req = "required"
+			}
+			line := fmt.Sprintf("%-6s    screen: %s (%s)", "", r.Name, req)
+			if len(r.Allowed) > 0 && len(r.Allowed) <= 15 {
+				line += ": " + strings.Join(r.Allowed, ", ")
+			}
+			fmt.Println(line)
+		}
 	}
 }
 

@@ -273,9 +273,9 @@ func (c *Client) EditIssue(ctx context.Context, key string, req *models.EditIssu
 	return err
 }
 
-// GetTransitions returns available transitions for an issue.
+// GetTransitions returns the transitions available now, with their screen fields.
 func (c *Client) GetTransitions(ctx context.Context, key string) ([]models.Transition, error) {
-	data, err := c.do(ctx, http.MethodGet, "/issue/"+url.PathEscape(key)+"/transitions", nil)
+	data, err := c.do(ctx, http.MethodGet, "/issue/"+url.PathEscape(key)+"/transitions?expand=transitions.fields", nil)
 	if err != nil {
 		return nil, err
 	}
