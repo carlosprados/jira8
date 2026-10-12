@@ -291,6 +291,17 @@ jira8 project fields --type Bug           # fields on the create screen, with al
 jira8 issue fields MYPROJ-123             # fields editable on this issue
 ```
 
+### Users
+
+```bash
+jira8 user search garcia                  # active users by username, name or email fragment
+jira8 user search ana --project MYPROJ    # only users assignable in MYPROJ
+jira8 user me                             # the authenticated user
+```
+
+`--assignee` and user fields take the **username** (`name`), which is what
+`user search` gives you.
+
 ### Output format
 
 All commands support `--output json` (or `-o json`) for machine-readable output.

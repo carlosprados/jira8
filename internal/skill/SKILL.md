@@ -33,6 +33,7 @@ is coloured and may change. Every Jira command honours `-o json`, writes include
 | `issue edit`, `epic edit` | `{key, updated: [field ids]}` (+ `attachments[]`) |
 | `transition` | `{key, transition, status}` |
 | `link` | `{outward, type, inward}` |
+| `user search`, `user me` | array / one `{name, key, displayName, emailAddress, active}` |
 | `project fields`, `issue fields` | array of `{id, name, required, type, items?, custom?, operations?, allowed?}` |
 | `*-delete`, `attachment delete` | `{…, id, deleted: true}` |
 
@@ -55,7 +56,13 @@ jira8 issue transitions ABC-123 -o json          # transitions valid NOW for thi
 jira8 issue link-types -o json
 jira8 project fields --project ABC --type Bug -o json   # fields on the create screen + allowed values
 jira8 issue fields ABC-123 -o json               # fields you can edit on this issue
+jira8 user search "garcia" --project ABC -o json # usernames assignable in ABC (name, email fragment)
+jira8 user me -o json                            # who jira8 is logged in as
 ```
+
+People are given by **username** (`name` in `user search`), never by display
+name: resolve "assign it to Ana" with `user search ana` first, and ask the user
+when several match. `--max` (default 20) caps the search.
 
 ## Read
 

@@ -7,6 +7,7 @@ import (
 	"github.com/amplia/jira8/cmd/epic"
 	"github.com/amplia/jira8/cmd/issue"
 	"github.com/amplia/jira8/cmd/project"
+	"github.com/amplia/jira8/cmd/user"
 	"github.com/amplia/jira8/internal/client"
 	"github.com/amplia/jira8/internal/config"
 	"github.com/spf13/cobra"
@@ -74,6 +75,7 @@ func init() {
 	rootCmd.AddCommand(issue.IssueCmd)
 	rootCmd.AddCommand(epic.EpicCmd)
 	rootCmd.AddCommand(project.ProjectCmd)
+	rootCmd.AddCommand(user.UserCmd)
 	rootCmd.AddCommand(skillCmd)
 }
 
