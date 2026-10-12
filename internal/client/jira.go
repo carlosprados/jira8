@@ -496,6 +496,44 @@ func (c *Client) GetCreateMeta(ctx context.Context, projectKey string) (*models.
 	return &meta.Projects[0], nil
 }
 
+// GetCreateFields returns the fields on the create screen of a project's
+// issue type, keyed by field id. The type name matches case-insensitively.
+func (c *Client) GetCreateFields(ctx context.Context, projectKey, issueType string) (map[string]models.FieldMeta, error) {
+	path := "/issue/createmeta?expand=projects.issuetypes.fields&projectKeys=" + url.QueryEscape(projectKey)
+	data, err := c.do(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+	var meta models.CreateMeta
+	if err := json.Unmarshal(data, &meta); err != nil {
+		return nil, fmt.Errorf("parsing create meta: %w", err)
+	}
+	if len(meta.Projects) == 0 {
+		return nil, fmt.Errorf("project %s not found or no issue types available", projectKey)
+	}
+	var names []string
+	for _, t := range meta.Projects[0].IssueTypes {
+		if strings.EqualFold(t.Name, issueType) {
+			return t.Fields, nil
+		}
+		names = append(names, t.Name)
+	}
+	return nil, fmt.Errorf("issue type %q not available in %s; available: %s", issueType, projectKey, strings.Join(names, ", "))
+}
+
+// GetEditFields returns the fields on an issue's edit screen, keyed by field id.
+func (c *Client) GetEditFields(ctx context.Context, key string) (map[string]models.FieldMeta, error) {
+	data, err := c.do(ctx, http.MethodGet, "/issue/"+url.PathEscape(key)+"/editmeta", nil)
+	if err != nil {
+		return nil, err
+	}
+	var meta models.EditMeta
+	if err := json.Unmarshal(data, &meta); err != nil {
+		return nil, fmt.Errorf("parsing edit meta: %w", err)
+	}
+	return meta.Fields, nil
+}
+
 // GetPriorities returns all available priorities.
 func (c *Client) GetPriorities(ctx context.Context) ([]models.Priority, error) {
 	data, err := c.do(ctx, http.MethodGet, "/priority", nil)

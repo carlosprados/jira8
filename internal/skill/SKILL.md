@@ -33,6 +33,7 @@ is coloured and may change. Every Jira command honours `-o json`, writes include
 | `issue edit`, `epic edit` | `{key, updated: [field ids]}` (+ `attachments[]`) |
 | `transition` | `{key, transition, status}` |
 | `link` | `{outward, type, inward}` |
+| `project fields`, `issue fields` | array of `{id, name, required, type, items?, custom?, operations?, allowed?}` |
 | `*-delete`, `attachment delete` | `{…, id, deleted: true}` |
 
 Issues are the Jira REST payload, so field names follow the Jira API
@@ -52,6 +53,8 @@ jira8 project statuses --project ABC -o json     # statuses per issue type
 jira8 project priorities -o json
 jira8 issue transitions ABC-123 -o json          # transitions valid NOW for this issue
 jira8 issue link-types -o json
+jira8 project fields --project ABC --type Bug -o json   # fields on the create screen + allowed values
+jira8 issue fields ABC-123 -o json               # fields you can edit on this issue
 ```
 
 ## Read
@@ -154,6 +157,31 @@ jira8 issue attachment add ABC-123 a.png b.log
   fails, the issue still exists: the error gives its key, retry with
   `issue attachment add`.
 
+## Labels, components, versions and custom fields
+
+```sh
+jira8 issue create --project ABC --type Story --summary "…" --labels backend,api --field "Story Points=5"
+jira8 issue edit ABC-123 --add-label urgent --remove-label triage
+jira8 issue edit ABC-123 --labels ""             # remove every label
+jira8 issue edit ABC-123 --field "Component/s=core,ui" --field "Fix Version/s=2.4"
+jira8 issue edit ABC-123 --field customfield_10300='{"value":"Gold"}'
+```
+
+- `--labels a,b` replaces the labels; `--add-label`/`--remove-label` keep the
+  rest (edit only, not combined with `--labels`). Labels have no spaces.
+- `--field NAME=VALUE` (repeatable) takes the field name or id as listed by
+  `project fields` (create) or `issue fields` (edit). The value is converted
+  by field type: numbers, option and user names (`me` works), versions and
+  components by name; arrays take commas or repeated flags; `""` clears; a
+  value starting with `{` or `[` is sent as raw JSON.
+- jira8 checks `--field` against the screen before writing: a field not on
+  it or a value outside `allowed` fails with the valid choices. Labels are not
+  pre-checked: if the project hides them, Jira answers 400 (see Errors).
+- All four (`issue create|edit`, `epic create|edit`) take `--labels` and
+  `--field`; both edits take `--add-label`/`--remove-label`.
+- Projects can have hundreds of versions: `jq` the `allowed` list rather than
+  reading it whole.
+
 ## Kanban order
 
 ```sh
@@ -193,8 +221,7 @@ nothing deleted can be recovered.
 
 Say so instead of improvising with the REST API:
 
-- labels, components, fix/affects versions, sprints, watchers, votes and custom
-  fields other than Epic Name/Link;
+- sprints, watchers and votes;
 - a resolution or a screen on a transition;
 - deleting, cloning or moving issues to another project (Jira Server 8 has no
   REST endpoint to move; it is done in the web UI);
@@ -209,7 +236,8 @@ prints the command usage.
   - `400` naming a value (`Priority name 'High' is not valid`): check
     `project types|statuses|priorities` or `issue transitions`;
   - `400` "Field 'x' cannot be set. It is not on the appropriate screen": the
-    project does not expose that field; nothing jira8 can do, tell the user;
+    project does not expose that field (`project fields` / `issue fields`
+    list what it does); nothing jira8 can do, tell the user;
   - `400` "Issue type is a sub-task but parent issue key…": add `--parent`;
   - `401` bad credentials, `403` no permission, `404` "Issue Does Not Exist"
     may just mean the issue is not visible to the user;

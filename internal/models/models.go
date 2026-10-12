@@ -138,6 +138,38 @@ type IssueType struct {
 	Name    string `json:"name"`
 	ID      string `json:"id"`
 	Subtask bool   `json:"subtask"`
+	// Fields is only filled by createmeta with expand=projects.issuetypes.fields.
+	Fields map[string]FieldMeta `json:"fields,omitempty"`
+}
+
+// FieldMeta describes a field on a create or edit screen (createmeta/editmeta).
+type FieldMeta struct {
+	Name          string         `json:"name"`
+	Required      bool           `json:"required"`
+	Schema        FieldSchema    `json:"schema"`
+	Operations    []string       `json:"operations,omitempty"`
+	AllowedValues []AllowedValue `json:"allowedValues,omitempty"`
+}
+
+// AllowedValue is one option of a field: options carry Value, the rest
+// (versions, components, priorities…) carry Name.
+type AllowedValue struct {
+	ID    string `json:"id"`
+	Name  string `json:"name,omitempty"`
+	Value string `json:"value,omitempty"`
+}
+
+// Label returns what a user types to pick this value.
+func (v AllowedValue) Label() string {
+	if v.Value != "" {
+		return v.Value
+	}
+	return v.Name
+}
+
+// EditMeta is the response of GET /rest/api/2/issue/{key}/editmeta.
+type EditMeta struct {
+	Fields map[string]FieldMeta `json:"fields"`
 }
 
 // Priority represents a Jira issue priority.
@@ -297,8 +329,10 @@ type TimeTracking struct {
 
 // EditIssueRequest is the PUT body for /rest/api/2/issue/{key}.
 // Uses map for partial updates — only changed fields are sent.
+// Update holds verb operations such as {"labels": [{"add": "x"}]}.
 type EditIssueRequest struct {
-	Fields map[string]any `json:"fields"`
+	Fields map[string]any              `json:"fields,omitempty"`
+	Update map[string][]map[string]any `json:"update,omitempty"`
 }
 
 // TransitionRequest is the POST body for /rest/api/2/issue/{key}/transitions.

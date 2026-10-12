@@ -6,11 +6,12 @@ import "github.com/spf13/cobra"
 var ProjectCmd = &cobra.Command{
 	Use:     "project",
 	Aliases: []string{"p"},
-	Short:   "Query project metadata (types, statuses, priorities)",
+	Short:   "Query project metadata (types, statuses, priorities, fields)",
 }
 
 func init() {
 	ProjectCmd.AddCommand(typesCmd)
 	ProjectCmd.AddCommand(statusesCmd)
 	ProjectCmd.AddCommand(prioritiesCmd)
+	ProjectCmd.AddCommand(fieldsCmd)
 }

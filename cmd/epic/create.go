@@ -10,10 +10,11 @@ import (
 )
 
 var createCmd = &cobra.Command{
-	Use:     "create",
-	Short:   "Create an Epic",
-	Example: "  jira8 epic create --name \"Q2 Refactor\" --summary \"Refactor billing pipeline\"",
-	RunE:    runCreate,
+	Use:   "create",
+	Short: "Create an Epic",
+	Example: "  jira8 epic create --name \"Q2 Refactor\" --summary \"Refactor billing pipeline\"\n" +
+		"  jira8 epic create --name \"Billing v2\" --summary \"Billing v2\" --labels billing --field \"Fix Version/s=2.4\"",
+	RunE: runCreate,
 }
 
 func init() {
@@ -25,6 +26,8 @@ func init() {
 	createCmd.Flags().String("assignee", "", "Assignee username (use 'me' for current user)")
 	createCmd.Flags().String("priority", "", "Priority name")
 	createCmd.Flags().Bool("markdown", false, "Treat --description as Markdown and convert it to Jira Wiki Markup; local images (![alt](path)) are attached to the issue")
+
+	app.AddFieldFlags(createCmd)
 
 	_ = createCmd.MarkFlagRequired("name")
 	_ = createCmd.MarkFlagRequired("summary")
@@ -52,13 +55,19 @@ func runCreate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	extra, err := app.CreateFields(cmd, project, "Epic")
+	if err != nil {
+		return err
+	}
+	extra[epicNameID] = name
+
 	req := &models.CreateIssueRequest{
 		Fields: models.CreateIssueFields{
 			Project:     models.ProjectRef{Key: project},
 			Summary:     summary,
 			IssueType:   models.TypeRef{Name: "Epic"},
 			Description: description,
-			Extra:       map[string]any{epicNameID: name},
+			Extra:       extra,
 		},
 	}
 

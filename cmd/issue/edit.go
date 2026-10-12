@@ -3,8 +3,6 @@ package issue
 import (
 	"context"
 	"fmt"
-	"maps"
-	"slices"
 
 	"github.com/amplia/jira8/cmd/app"
 	"github.com/amplia/jira8/internal/models"
@@ -16,7 +14,9 @@ var editCmd = &cobra.Command{
 	Short: "Edit an issue",
 	Example: `  jira8 issue edit ABC-123 --summary "New title" --assignee me
   jira8 issue edit ABC-123 --due-date 2026-09-24 --original-estimate 5d
-  jira8 issue edit ABC-123 --due-date ""              # clear the due date`,
+  jira8 issue edit ABC-123 --due-date ""              # clear the due date
+  jira8 issue edit ABC-123 --add-label urgent --remove-label triage
+  jira8 issue edit ABC-123 --field "Story Points=8" --field "Fix Version/s=2.4,2.5"`,
 	Args: cobra.ExactArgs(1),
 	RunE: runEdit,
 }
@@ -33,6 +33,8 @@ func init() {
 	editCmd.Flags().String("original-estimate", "", "Original time estimate, e.g. 3d, 5h, 1h30m")
 	editCmd.Flags().Bool("markdown", false, "Treat --description as Markdown and convert it to Jira Wiki Markup; local images (![alt](path)) are attached to the issue")
 	editCmd.Flags().StringArray("attach", nil, "Attach a file to the issue (repeatable). Can be used alone, without other field edits.")
+	app.AddFieldFlags(editCmd)
+	app.AddLabelEditFlags(editCmd)
 }
 
 func runEdit(cmd *cobra.Command, args []string) error {
@@ -111,10 +113,15 @@ func runEdit(cmd *cobra.Command, args []string) error {
 		fields["timetracking"] = models.TimeTracking{OriginalEstimate: v}
 	}
 
+	update, err := app.EditFields(cmd, key, fields)
+	if err != nil {
+		return err
+	}
+
 	attachFiles, _ := cmd.Flags().GetStringArray("attach")
 
-	if len(fields) == 0 && len(attachFiles) == 0 {
-		return fmt.Errorf("no fields to update; use --summary, --description, --assignee, --priority, --epic-name, --epic-link, --due-date, --original-estimate, or --attach")
+	if len(fields) == 0 && len(update) == 0 && len(attachFiles) == 0 {
+		return fmt.Errorf("no fields to update; use --summary, --description, --assignee, --priority, --epic-name, --epic-link, --due-date, --original-estimate, --labels, --add-label, --remove-label, --field or --attach")
 	}
 
 	// Images first, so the new description renders them as soon as it lands.
@@ -123,8 +130,8 @@ func runEdit(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if len(fields) > 0 {
-		req := &models.EditIssueRequest{Fields: fields}
+	if len(fields) > 0 || len(update) > 0 {
+		req := &models.EditIssueRequest{Fields: fields, Update: update}
 		if err := a.Client.EditIssue(context.Background(), key, req); err != nil {
 			return err
 		}
@@ -143,9 +150,9 @@ func runEdit(cmd *cobra.Command, args []string) error {
 			Key         string              `json:"key"`
 			Updated     []string            `json:"updated"`
 			Attachments []models.Attachment `json:"attachments,omitempty"`
-		}{key, slices.Sorted(maps.Keys(fields)), uploaded})
+		}{key, app.UpdatedFields(fields, update), uploaded})
 	}
-	if len(fields) > 0 {
+	if len(fields) > 0 || len(update) > 0 {
 		fmt.Printf("Updated %s\n", key)
 	}
 	if len(uploaded) > 0 {
