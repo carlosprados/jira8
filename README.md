@@ -244,6 +244,14 @@ jira8 issue link A B --type "Relates" --comment "note"   # with an optional comm
 The first key is the subject of the relation ("OUTWARD *phrase* INWARD"); for symmetric
 types like `Relates` the order is irrelevant. `--type` defaults to `Relates`.
 
+```bash
+jira8 issue links MYPROJ-9                               # ID, phrase, issue, status, summary
+jira8 issue link-delete 55539                            # asks; --yes in scripts
+```
+
+`issue links` reads each link from that issue's side: the same link shows as
+"blocks MYPROJ-10" on MYPROJ-9 and "is blocked by MYPROJ-9" on MYPROJ-10.
+
 ### Comments
 
 ```bash

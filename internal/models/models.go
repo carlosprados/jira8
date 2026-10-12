@@ -569,3 +569,12 @@ type RankIssuesRequest struct {
 	// LexoRank one), so we always send the resolved ID to stay unambiguous.
 	RankCustomFieldID int `json:"rankCustomFieldId,omitempty"`
 }
+
+// IssueLink is an existing link as Jira returns it, inside fields.issuelinks
+// (only the other issue is set) or from GET /issueLink/{id} (both are set).
+type IssueLink struct {
+	ID           string        `json:"id"`
+	Type         IssueLinkType `json:"type"`
+	InwardIssue  *Issue        `json:"inwardIssue,omitempty"`
+	OutwardIssue *Issue        `json:"outwardIssue,omitempty"`
+}
