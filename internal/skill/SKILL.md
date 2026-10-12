@@ -36,6 +36,8 @@ is coloured and may change. Every Jira command honours `-o json`, writes include
 | `user search`, `user me` | array / one `{name, key, displayName, emailAddress, active}` |
 | `project fields`, `issue fields` | array of `{id, name, required, type, items?, custom?, operations?, allowed?}` |
 | `*-delete`, `attachment delete` | `{…, id, deleted: true}` |
+| any write with `--dry-run` | `{dry_run: true, requests: [{method, path, body?, files?}]}` |
+| `markup md2wiki`, `markup wiki2md` | `{wiki}` / `{markdown}` |
 
 Issues are the Jira REST payload, so field names follow the Jira API
 (`fields.status.name`, `fields.assignee.name`…). Chain steps with `jq`:
@@ -130,6 +132,15 @@ cat notes.md | jira8 issue comment-add ABC-123 --markdown --body-file -
 
 `--description-file`, `--body-file` and `--comment-file` accept `-` for stdin.
 
+To see a conversion without touching Jira (no config needed):
+
+```sh
+jira8 markup md2wiki spec.md                     # what --markdown would send
+jira8 issue view ABC-123 -o json | jq -r .fields.description | jira8 markup wiki2md
+```
+
+`md2wiki` does not upload images: it only shows the `!name|alt=…!` they become.
+
 ## Write
 
 ```sh
@@ -168,6 +179,18 @@ jira8 issue attachment add ABC-123 a.png b.log
 - `issue create` uploads attachments after creating the issue. If the upload
   fails, the issue still exists: the error gives its key, retry with
   `issue attachment add`.
+- **`--dry-run`** on any Jira command prints the requests it would send (method,
+  path, JSON body, files to upload) and sends none; exit 0. Reads still go to
+  Jira, so what jira8 checks itself (`--field`, `--labels`, transition names
+  and screens, users, link types, boards) fails as usual. What only Jira checks
+  when it receives the write (issue type, priority, required fields of create,
+  ids that do not exist) does **not**: a clean dry run does not promise the
+  write will be accepted. A dry-run create calls the new issue `NEW`; deletes
+  need no `--yes`. On a read command it changes nothing.
+
+```sh
+jira8 issue create --project ABC --type Task --summary "…" --markdown --description-file spec.md --dry-run
+```
 
 ## Labels, components, versions and custom fields
 

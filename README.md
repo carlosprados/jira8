@@ -313,6 +313,22 @@ jira8 user me                             # the authenticated user
 
 All commands support `--output json` (or `-o json`) for machine-readable output.
 
+### Dry run
+
+`--dry-run` on any Jira command prints the requests it would send and sends
+none:
+
+```bash
+jira8 issue create --type Task --summary "Spike" --markdown --description-file spike.md --dry-run
+jira8 issue transition MYPROJ-123 --to Done --field "Resolution=Fixed" --comment "Shipped" --dry-run -o json
+```
+
+Reads still go to Jira, so the checks jira8 makes itself (screen fields,
+transitions, users, link types, boards) run as usual. The ones Jira only makes
+when it receives the write (issue type, priority, required fields on create)
+do not, so a clean dry run is not a guarantee. A dry-run create names the new
+issue `NEW`; deletes need no `--yes`.
+
 ### Markdown and Wiki Markup
 
 Jira Server 8 stores descriptions, comments and worklog comments as Wiki Markup.
@@ -367,6 +383,13 @@ Relative paths resolve against the Markdown file (or the working directory for
 inline text and stdin). Missing files and two different files sharing a name
 are reported before anything is written; re-sending the same description does
 not attach the same image twice. Image URLs are linked, not uploaded.
+
+To try a conversion offline, without config or Jira:
+
+```bash
+jira8 markup md2wiki spec.md
+echo 'h2. Title' | jira8 markup wiki2md
+```
 
 ## Agent skill
 

@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"io"
+	"os"
 
 	"github.com/amplia/jira8/cmd/app"
 	"github.com/amplia/jira8/cmd/epic"
@@ -16,6 +18,7 @@ import (
 
 var (
 	configFile string
+	dryRun     bool
 
 	// Set by GoReleaser via ldflags.
 	version = "dev"
@@ -47,11 +50,24 @@ Use -o json to read the output from a script. Coding agents: run
 			return fmt.Errorf("loading config: %w", err)
 		}
 
+		c := client.New(cfg)
 		app.Set(&app.State{
 			Config: cfg,
-			Client: client.New(cfg),
+			Client: c,
 			Output: viper.GetString("output"),
 		})
+		if dryRun {
+			// What a write command prints describes writes that never
+			// happened: Execute prints the planned requests instead, or
+			// replays this output when the command wrote nothing.
+			c.SetDryRun(true)
+			f, err := os.CreateTemp("", "jira8-dry-run-*")
+			if err != nil {
+				return err
+			}
+			_ = os.Remove(f.Name())
+			os.Stdout = f
+		}
 		return nil
 	},
 	SilenceErrors: true,
@@ -63,6 +79,7 @@ func init() {
 	rootCmd.PersistentFlags().String("token", "", "Personal access token")
 	rootCmd.PersistentFlags().String("project", "", "Default project key")
 	rootCmd.PersistentFlags().StringP("output", "o", "text", "Output format: text or json")
+	rootCmd.PersistentFlags().BoolVar(&dryRun, "dry-run", false, "Validate against Jira and print the writes instead of sending them")
 
 	_ = viper.BindPFlag("url", rootCmd.PersistentFlags().Lookup("url"))
 	_ = viper.BindPFlag("token", rootCmd.PersistentFlags().Lookup("token"))
@@ -76,14 +93,40 @@ func init() {
 	rootCmd.AddCommand(epic.EpicCmd)
 	rootCmd.AddCommand(project.ProjectCmd)
 	rootCmd.AddCommand(user.UserCmd)
+	rootCmd.AddCommand(markupCmd)
 	rootCmd.AddCommand(skillCmd)
 }
 
 // Execute runs the root command.
 func Execute() error {
-	if err := rootCmd.Execute(); err != nil {
+	stdout := os.Stdout
+	err := rootCmd.Execute()
+	captured := os.Stdout
+	os.Stdout = stdout
+	if err != nil {
 		_, _ = fmt.Fprintf(rootCmd.ErrOrStderr(), "Error: %s\n", err)
 		return err
 	}
-	return nil
+	s := app.Get()
+	if !dryRun || s == nil || !s.Client.DryRun() {
+		return nil
+	}
+	if len(s.Client.Planned()) == 0 {
+		return replay(captured, stdout)
+	}
+	return app.PrintPlan(stdout)
+}
+
+// replay copies the output a --dry-run captured for a command that turned out
+// to write nothing, such as a read.
+func replay(captured, stdout *os.File) error {
+	if captured == stdout {
+		return nil
+	}
+	defer func() { _ = captured.Close() }()
+	if _, err := captured.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+	_, err := io.Copy(stdout, captured)
+	return err
 }

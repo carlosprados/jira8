@@ -14,7 +14,7 @@ import (
 // "no": a script or agent would otherwise get exit 0 for a deletion that never
 // happened.
 func Confirm(prompt string, yes bool) (bool, error) {
-	if yes {
+	if yes || (Get() != nil && Get().Client.DryRun()) {
 		return true, nil
 	}
 	if !term.IsTerminal(int(os.Stdin.Fd())) {

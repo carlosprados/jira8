@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/amplia/jira8/internal/client"
 	"github.com/amplia/jira8/internal/markup"
 	"github.com/amplia/jira8/internal/models"
 	"github.com/spf13/cobra"
@@ -81,13 +82,15 @@ func UploadImages(ctx context.Context, key string, files []string) ([]models.Att
 		return nil, nil
 	}
 	c := Get().Client
-	existing, err := c.ListAttachments(ctx, key)
-	if err != nil {
-		return nil, err
-	}
 	have := map[string]int64{}
-	for _, a := range existing {
-		have[a.Filename] = a.Size
+	if key != client.DryRunKey || !c.DryRun() {
+		existing, err := c.ListAttachments(ctx, key)
+		if err != nil {
+			return nil, err
+		}
+		for _, a := range existing {
+			have[a.Filename] = a.Size
+		}
 	}
 	var todo []string
 	for _, f := range files {
