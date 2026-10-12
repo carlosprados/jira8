@@ -185,6 +185,15 @@ type User struct {
 	EmailAddress string `json:"emailAddress"`
 }
 
+// UserInfo is a user as returned by /myself and /user/search.
+type UserInfo struct {
+	Name         string `json:"name"`
+	Key          string `json:"key,omitempty"`
+	DisplayName  string `json:"displayName"`
+	EmailAddress string `json:"emailAddress,omitempty"`
+	Active       bool   `json:"active"`
+}
+
 // Project represents a Jira project.
 type Project struct {
 	Key  string `json:"key"`

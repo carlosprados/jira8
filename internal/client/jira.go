@@ -450,6 +450,39 @@ func (c *Client) GetMyself(ctx context.Context) (*models.User, error) {
 	return &user, nil
 }
 
+// SearchUsers finds active users whose username, name or email matches query.
+// With a project, only users assignable to issues in it are returned.
+func (c *Client) SearchUsers(ctx context.Context, query, project string, max int) ([]models.UserInfo, error) {
+	q := url.Values{"username": {query}, "maxResults": {strconv.Itoa(max)}}
+	path := "/user/search?"
+	if project != "" {
+		path = "/user/assignable/search?"
+		q.Set("project", project)
+	}
+	data, err := c.do(ctx, http.MethodGet, path+q.Encode(), nil)
+	if err != nil {
+		return nil, err
+	}
+	var users []models.UserInfo
+	if err := json.Unmarshal(data, &users); err != nil {
+		return nil, fmt.Errorf("parsing users: %w", err)
+	}
+	return users, nil
+}
+
+// Me returns the authenticated user.
+func (c *Client) Me(ctx context.Context) (*models.UserInfo, error) {
+	data, err := c.do(ctx, http.MethodGet, "/myself", nil)
+	if err != nil {
+		return nil, err
+	}
+	var u models.UserInfo
+	if err := json.Unmarshal(data, &u); err != nil {
+		return nil, fmt.Errorf("parsing user: %w", err)
+	}
+	return &u, nil
+}
+
 // ResolveAssignee maps the "me" alias (case-insensitive) to the authenticated
 // user's username via GetMyself; any other value is returned unchanged. Callers
 // are responsible for the empty-string case (skip the field, or clear it).
