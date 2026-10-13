@@ -94,6 +94,8 @@ func init() {
 	rootCmd.AddCommand(project.ProjectCmd)
 	rootCmd.AddCommand(user.UserCmd)
 	rootCmd.AddCommand(openCmd)
+	rootCmd.AddCommand(pingCmd)
+	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(markupCmd)
 	rootCmd.AddCommand(skillCmd)
 }

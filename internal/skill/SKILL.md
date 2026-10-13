@@ -40,6 +40,8 @@ is coloured and may change. Every Jira command honours `-o json`, writes include
 | any write with `--dry-run` | `{dry_run: true, requests: [{method, path, body?, files?}]}` |
 | `markup md2wiki`, `markup wiki2md` | `{wiki}` / `{markdown}` |
 | `open` | `{key, url}` (does not launch a browser) |
+| `ping` | `{baseUrl, version, deploymentType, serverTitle, ms}` |
+| `config show` | `{file, auth, values: {url, project, user, token, password: {value?, set, source}}, problems: []}` |
 
 Issues are the Jira REST payload, so field names follow the Jira API
 (`fields.status.name`, `fields.assignee.name`…), plus `url`: the issue in the
@@ -298,4 +300,13 @@ command usage. The exit code tells what failed:
   - `429` (rate limit) is retried automatically.
 - `cannot reach Jira (check the network or VPN)`: the server is not reachable
   from this machine. Do not retry in a loop or touch the config; tell the user.
+- To diagnose, without changing anything:
+
+  ```sh
+  jira8 config show -o json    # file read, each value's source (flag/env/file), problems
+  jira8 ping                   # does Jira answer? version, base URL, latency
+  jira8 user me                # do the credentials work?
+  ```
+
+  `config show` never prints the token or password, only whether they are set.
 - `no project: pass --project KEY…`: pass `--project`.

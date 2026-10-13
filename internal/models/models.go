@@ -581,3 +581,11 @@ type IssueLink struct {
 	InwardIssue  *Issue        `json:"inwardIssue,omitempty"`
 	OutwardIssue *Issue        `json:"outwardIssue,omitempty"`
 }
+
+// ServerInfo is GET /rest/api/2/serverInfo, readable without credentials.
+type ServerInfo struct {
+	BaseURL        string `json:"baseUrl"`
+	Version        string `json:"version"`
+	DeploymentType string `json:"deploymentType"`
+	ServerTitle    string `json:"serverTitle"`
+}
