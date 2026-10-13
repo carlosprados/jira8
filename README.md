@@ -236,6 +236,7 @@ jira8 board view 110 --assignee me --max 0              # your counts per column
 jira8 board view 110 --stale 7d                         # flag cards stuck for a week
 jira8 board view 110 --by-assignee --stale 7d           # work in progress per person
 jira8 board flow 110 --since 30d                        # throughput, cycle time p50/p85, time per column
+jira8 board aging 110 --older-than 14d                  # age of every in-progress card
 jira8 issue move MYPROJ-1 --column "In Progress" --top  # drag a card: transition + rank
 ```
 
@@ -249,6 +250,10 @@ throughput per week, cycle time (calendar days from the first in-progress
 column, or `--start-column`, to done) as p50/p85/max, and how that time splits
 across the columns. It reads each issue's history, without the board's kanban
 sub-filter so older done issues count.
+
+`board aging` gives every in-progress card two ages: days in its current
+column, and days since its work started (same rule as `board flow`). A card
+older than the cycle time p85 is already slower than 85% of the finished ones.
 
 `board view` reads the board as Jira draws it: its saved filter and kanban
 sub-filter (old Done issues stay hidden), its columns and their statuses, and

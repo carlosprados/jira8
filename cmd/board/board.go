@@ -62,7 +62,7 @@ func init() {
 	viewCmd.Flags().String("stale", "", "Flag in-progress cards whose status has not changed for this long (7d, 2w, 12h)")
 	viewCmd.Flags().Bool("by-assignee", false, "Count the in-progress cards per assignee")
 	viewCmd.MarkFlagsMutuallyExclusive("by-assignee", "assignee")
-	BoardCmd.AddCommand(listCmd, viewCmd, flowCmd)
+	BoardCmd.AddCommand(listCmd, viewCmd, flowCmd, agingCmd)
 }
 
 var (
