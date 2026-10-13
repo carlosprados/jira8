@@ -208,11 +208,12 @@ func (c *Client) SearchIssues(ctx context.Context, jql string, startAt, maxResul
 	return &result, nil
 }
 
-// SearchAllIssues fetches all issues matching JQL with automatic pagination.
-// If max <= 0, fetches all results.
-func (c *Client) SearchAllIssues(ctx context.Context, jql string, max int, extraFields ...string) ([]models.Issue, error) {
+// SearchAllIssues fetches the issues matching JQL with automatic pagination,
+// up to max (all when max <= 0). It also returns how many match in total, so
+// callers can tell a truncated list from a complete one.
+func (c *Client) SearchAllIssues(ctx context.Context, jql string, max int, extraFields ...string) ([]models.Issue, int, error) {
 	var all []models.Issue
-	startAt := 0
+	startAt, total := 0, 0
 
 	for {
 		perPage := pageSize
@@ -222,12 +223,12 @@ func (c *Client) SearchAllIssues(ctx context.Context, jql string, max int, extra
 
 		result, err := c.SearchIssues(ctx, jql, startAt, perPage, extraFields...)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
-
+		total = result.Total
 		all = append(all, result.Issues...)
 
-		if startAt+len(result.Issues) >= result.Total {
+		if len(result.Issues) == 0 || startAt+len(result.Issues) >= result.Total {
 			break
 		}
 		if max > 0 && len(all) >= max {
@@ -236,7 +237,7 @@ func (c *Client) SearchAllIssues(ctx context.Context, jql string, max int, extra
 		startAt += len(result.Issues)
 	}
 
-	return all, nil
+	return all, total, nil
 }
 
 // GetIssue fetches a single issue by key.
@@ -654,41 +655,86 @@ func (c *Client) GetPriorities(ctx context.Context) ([]models.Priority, error) {
 // JQLFilters groups the individual filter inputs accepted by BuildJQLWith.
 // Fields are optional — empty values are skipped.
 type JQLFilters struct {
-	Project  string
-	Status   string
-	Assignee string
-	Epic     string // issue key whose Epic Link equals this value
-	Type     string // issue type name (e.g. "Epic", "Story")
+	Project      string
+	Status       string
+	Assignee     string // username or "me"
+	Reporter     string // username or "me"
+	Epic         string // issue key whose Epic Link equals this value
+	Type         string // issue type name (e.g. "Epic", "Story")
+	Priority     string
+	Component    string
+	Labels       []string // all of them
+	Text         string   // full-text search (summary, description, comments)
+	CreatedAfter string   // JQL date: 2026-10-01 or relative -7d
+	UpdatedAfter string
+	Sort         string // created, updated, priority, key or rank; default updated
+	Asc          bool
+}
+
+// SortFields maps the --sort names to their JQL field.
+var SortFields = map[string]string{
+	"created": "created", "updated": "updated", "priority": "priority", "key": "key", "rank": "Rank",
 }
 
 // BuildJQLWith constructs a JQL query from a JQLFilters struct.
 func BuildJQLWith(f JQLFilters) string {
 	var clauses []string
-
-	if f.Project != "" {
-		clauses = append(clauses, fmt.Sprintf("project = %s", f.Project))
-	}
-	if f.Status != "" {
-		clauses = append(clauses, fmt.Sprintf("status = \"%s\"", f.Status))
-	}
-	if f.Assignee != "" {
-		if strings.EqualFold(f.Assignee, "me") {
-			clauses = append(clauses, "assignee = currentUser()")
-		} else {
-			clauses = append(clauses, fmt.Sprintf("assignee = \"%s\"", f.Assignee))
+	add := func(field, value string) {
+		if value != "" {
+			clauses = append(clauses, field+" = "+jqlQuote(value))
 		}
 	}
-	if f.Type != "" {
-		clauses = append(clauses, fmt.Sprintf("issuetype = \"%s\"", f.Type))
-	}
-	if f.Epic != "" {
-		clauses = append(clauses, fmt.Sprintf("\"Epic Link\" = %s", f.Epic))
+	user := func(field, value string) {
+		if strings.EqualFold(value, "me") {
+			clauses = append(clauses, field+" = currentUser()")
+		} else {
+			add(field, value)
+		}
 	}
 
-	if len(clauses) == 0 {
-		return "ORDER BY updated DESC"
+	if f.Project != "" {
+		clauses = append(clauses, "project = "+f.Project)
 	}
-	return strings.Join(clauses, " AND ") + " ORDER BY updated DESC"
+	add("status", f.Status)
+	user("assignee", f.Assignee)
+	user("reporter", f.Reporter)
+	add("issuetype", f.Type)
+	add("priority", f.Priority)
+	add("component", f.Component)
+	for _, l := range f.Labels {
+		add("labels", l)
+	}
+	if f.Epic != "" {
+		clauses = append(clauses, `"Epic Link" = `+f.Epic)
+	}
+	if f.Text != "" {
+		clauses = append(clauses, "text ~ "+jqlQuote(f.Text))
+	}
+	if f.CreatedAfter != "" {
+		clauses = append(clauses, "created >= "+jqlQuote(f.CreatedAfter))
+	}
+	if f.UpdatedAfter != "" {
+		clauses = append(clauses, "updated >= "+jqlQuote(f.UpdatedAfter))
+	}
+
+	order := "updated"
+	if field, ok := SortFields[f.Sort]; ok {
+		order = field
+	}
+	dir := " DESC"
+	if f.Asc {
+		dir = " ASC"
+	}
+	orderBy := "ORDER BY " + order + dir
+	if len(clauses) == 0 {
+		return orderBy
+	}
+	return strings.Join(clauses, " AND ") + " " + orderBy
+}
+
+// jqlQuote makes s a JQL string literal.
+func jqlQuote(s string) string {
+	return `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(s) + `"`
 }
 
 // GetFields returns all field descriptors from the Jira instance (system + custom).

@@ -77,6 +77,10 @@ when several match. `--max` (default 20) caps the search.
 ```sh
 jira8 issue list --status "In Progress" --assignee me -o json
 jira8 issue list --type Bug --max 100 -o json
+jira8 issue list --label backend --label urgent --reporter me --updated-after -7d -o json
+jira8 issue list --text "timeout" --component API --priority Major --created-after 2026-10-01 -o json
+jira8 issue list --status Done --sort created --asc --all -o json
+jira8 issue list --fields labels,components,customfield_10011 -o json
 jira8 issue list --jql 'project = ABC AND updated >= -7d ORDER BY updated DESC' -o json
 jira8 issue view ABC-123 -o json
 jira8 issue view ABC-123 --with-history -o json  # + changelog.histories[]
@@ -91,8 +95,20 @@ jira8 epic children ABC-42 -o json
 - `issue links` reads each link from the issue's side: `phrase` is what this
   issue does to `key` (`direction: outward`) or suffers from it (`inward`).
   `link-delete` answers which link it removed: `{id, outward, type, inward, deleted}`.
-- `--jql` overrides every other filter of `issue list`. `--max` defaults to 50.
-  Without `--project` and without a configured project, `issue list` searches
+- `issue list` filters combine with AND; `--label` repeats (all of them).
+  `--text` searches summary, description and comments. Dates take
+  `YYYY-MM-DD` or a relative period (`-7d`, `-2w`, `-12h`).
+- `--jql` overrides every other filter of `issue list`; `--sort`/`--asc`
+  replace its `ORDER BY` only when given. `--sort`: `updated` (default),
+  `created`, `priority`, `key`, `rank`; newest/highest first, `--asc` for the
+  reverse (board order with `rank`).
+- `--max` defaults to 50; `--all` fetches every match. When more issues match
+  than are returned, stderr says `Showing N of M issues` (the JSON array stays
+  as is): do not assume a list is complete without checking it.
+- `issue list` fetches a fixed set of fields (summary, status, assignee,
+  priority, type, project, dates). `--fields` adds more by **id** (`labels`,
+  `components`, `fixVersions`, `customfield_…`; ids from `project fields`).
+- Without `--project` and without a configured project, `issue list` searches
   every project.
 - `--with-history` returns the full changelog. Description edits store the
   whole text each time: one issue can carry ~1 MB of history. In JSON nothing
