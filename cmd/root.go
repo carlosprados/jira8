@@ -125,8 +125,9 @@ func Execute() error {
 	if err != nil {
 		_, _ = fmt.Fprintf(rootCmd.ErrOrStderr(), "Error: %s\n", err)
 		// Every command hook sets SilenceUsage once flags and args are valid:
-		// still unset means cobra rejected the command line itself.
-		if !c.SilenceUsage {
+		// still unset means cobra rejected the command line itself. Cobra
+		// checks required and exclusive flags after the hooks, so ask again.
+		if !c.SilenceUsage || c.ValidateRequiredFlags() != nil || c.ValidateFlagGroups() != nil {
 			return usageError{err}
 		}
 		return err
