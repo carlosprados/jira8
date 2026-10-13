@@ -591,3 +591,10 @@ type ServerInfo struct {
 	DeploymentType string `json:"deploymentType"`
 	ServerTitle    string `json:"serverTitle"`
 }
+
+// Watchers is GET /rest/api/2/issue/{key}/watchers.
+type Watchers struct {
+	IsWatching bool       `json:"isWatching"`
+	WatchCount int        `json:"watchCount"`
+	Watchers   []UserInfo `json:"watchers"`
+}

@@ -334,6 +334,42 @@ func (c *Client) LinkIssues(ctx context.Context, req *models.IssueLinkRequest) e
 	return err
 }
 
+// Assign sets the assignee (username, or "" to unassign). Unlike an edit it
+// needs only the Assign Issues permission.
+func (c *Client) Assign(ctx context.Context, key, username string) error {
+	var name *string
+	if username != "" {
+		name = &username
+	}
+	_, err := c.do(ctx, http.MethodPut, "/issue/"+url.PathEscape(key)+"/assignee", map[string]*string{"name": name})
+	return err
+}
+
+// GetWatchers lists who watches an issue.
+func (c *Client) GetWatchers(ctx context.Context, key string) (*models.Watchers, error) {
+	data, err := c.do(ctx, http.MethodGet, "/issue/"+url.PathEscape(key)+"/watchers", nil)
+	if err != nil {
+		return nil, err
+	}
+	var w models.Watchers
+	if err := json.Unmarshal(data, &w); err != nil {
+		return nil, fmt.Errorf("parsing watchers: %w", err)
+	}
+	return &w, nil
+}
+
+// AddWatcher makes username watch the issue.
+func (c *Client) AddWatcher(ctx context.Context, key, username string) error {
+	_, err := c.do(ctx, http.MethodPost, "/issue/"+url.PathEscape(key)+"/watchers", username)
+	return err
+}
+
+// RemoveWatcher stops username watching the issue.
+func (c *Client) RemoveWatcher(ctx context.Context, key, username string) error {
+	_, err := c.do(ctx, http.MethodDelete, "/issue/"+url.PathEscape(key)+"/watchers?username="+url.QueryEscape(username), nil)
+	return err
+}
+
 // ServerInfo returns the server version and base URL.
 func (c *Client) ServerInfo(ctx context.Context) (*models.ServerInfo, error) {
 	data, err := c.do(ctx, http.MethodGet, "/serverInfo", nil)

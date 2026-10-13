@@ -30,4 +30,8 @@ func init() {
 	IssueCmd.AddCommand(linkTypesCmd)
 	IssueCmd.AddCommand(linksCmd)
 	IssueCmd.AddCommand(linkDeleteCmd)
+	IssueCmd.AddCommand(assignCmd)
+	IssueCmd.AddCommand(watchCmd)
+	IssueCmd.AddCommand(unwatchCmd)
+	IssueCmd.AddCommand(watchersCmd)
 }

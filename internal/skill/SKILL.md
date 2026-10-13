@@ -1,6 +1,6 @@
 ---
 name: jira8
-description: Read and change issues in a Jira Server 8 / Data Center instance from the shell with the `jira8` CLI — list and search (JQL), view with comments and change history, create, edit, transition, rank on a kanban board, link, comment, log work, attach files, manage Epics, and query a project's valid types, statuses and priorities. Load whenever the task mentions Jira, an issue key (ABC-123), tickets, bugs, stories, epics, sprints or kanban columns, worklogs or "imputar horas" in Jira, or turning notes into Jira issues. Use INSTEAD of calling the Jira REST API by hand.
+description: Read and change issues in a Jira Server 8 / Data Center instance from the shell with the `jira8` CLI — list and search (JQL), view with comments and change history, create, edit, transition, rank on a kanban board, link, assign, watch, comment, log work, attach files, manage Epics, and query a project's valid types, statuses and priorities. Load whenever the task mentions Jira, an issue key (ABC-123), tickets, bugs, stories, epics, sprints or kanban columns, worklogs or "imputar horas" in Jira, or turning notes into Jira issues. Use INSTEAD of calling the Jira REST API by hand.
 ---
 
 # jira8 — Jira Server 8 from the shell
@@ -33,6 +33,8 @@ is coloured and may change. Every Jira command honours `-o json`, writes include
 | `issue edit`, `epic edit` | `{key, url, updated: [field ids]}` (+ `attachments[]`) |
 | `transition` | `{key, transition, status}` (+ `updated`, `comment` id, `attachments[]`) |
 | `link` | `{outward, type, inward}` |
+| `assign` / `watch`, `unwatch` | `{key, assignee}` / `{key, watcher, watching}` |
+| `watchers` | `{isWatching, watchCount, watchers: [{name, displayName…}]}` |
 | `issue links` | array of `{id, type, direction, phrase, key, summary, status}`, seen from that issue |
 | `user search`, `user me` | array / one `{name, key, displayName, emailAddress, active}` |
 | `project fields`, `issue fields` | array of `{id, name, required, type, items?, custom?, operations?, allowed?}` |
@@ -175,6 +177,10 @@ jira8 issue create --project ABC --type Sub-task --parent ABC-123 --summary "…
 jira8 issue create --project ABC --type Story --epic-link ABC-42 --summary "…" --attach log.txt
 jira8 issue edit ABC-123 --assignee me --priority Critical
 jira8 issue edit ABC-123 --assignee ""           # unassign ("" clears: also --epic-link, --due-date)
+jira8 issue assign ABC-123 jdoe                  # also me, or "" to unassign
+jira8 issue watch ABC-123                        # you, or a USER as 2nd arg
+jira8 issue unwatch ABC-123 jdoe
+jira8 issue watchers ABC-123 -o json
 jira8 issue edit ABC-123 --due-date 2026-11-30 --original-estimate 3d
 jira8 issue transition ABC-123 --to "In Progress"
 jira8 issue transition ABC-123 --to Done --field "Resolution=Fixed" --markdown --comment "…"
@@ -187,6 +193,9 @@ jira8 issue attachment add ABC-123 a.png b.log
 
 - `issue edit` only sends the flags you pass, and is all or nothing: if Jira
   rejects one field, none changes.
+- `issue assign` needs only the Assign permission: use it when `issue edit
+  --assignee` is refused (403). Some projects require an assignee, so `""` can
+  fail with "Issues must be assigned".
 - `--assignee me` resolves the current user. Users are Jira **usernames**
   (`{"name": …}`), not Cloud `accountId`s.
 - Durations (`--time`, `--original-estimate`) take `w d h m`: `2h`, `1h30m`,
@@ -283,7 +292,7 @@ nothing deleted can be recovered.
 
 Say so instead of improvising with the REST API:
 
-- sprints, watchers and votes;
+- sprints and votes;
 - deleting, cloning or moving issues to another project (Jira Server 8 has no
   REST endpoint to move; it is done in the web UI);
 - filters, dashboards, boards configuration, admin settings.
