@@ -525,6 +525,9 @@ type BoardConfiguration struct {
 	Type         string            `json:"type,omitempty"`
 	Filter       BoardFilter       `json:"filter"`
 	ColumnConfig BoardColumnConfig `json:"columnConfig"`
+	// SubQuery is the kanban sub-filter (typically hiding old Done issues),
+	// applied on top of Filter.
+	SubQuery *BoardSubQuery `json:"subQuery,omitempty"`
 	// Ranking carries the instance's rank custom field ID. Some boards return an
 	// empty object here, so callers must fall back to resolving SchemaRank via
 	// GET /rest/api/2/field.
@@ -540,6 +543,14 @@ type BoardFilter struct {
 // BoardColumnConfig holds the ordered columns of a board, left to right.
 type BoardColumnConfig struct {
 	Columns []BoardColumn `json:"columns"`
+	// ConstraintType says what WIP limits count: "issueCount",
+	// "issueCountExclSubs" (sub-tasks do not count) or "none".
+	ConstraintType string `json:"constraintType,omitempty"`
+}
+
+// BoardSubQuery is the kanban sub-filter of a board.
+type BoardSubQuery struct {
+	Query string `json:"query"`
 }
 
 // BoardColumn is a single board column. A column maps to zero or more statuses;
@@ -548,6 +559,8 @@ type BoardColumnConfig struct {
 type BoardColumn struct {
 	Name     string              `json:"name"`
 	Statuses []BoardColumnStatus `json:"statuses"`
+	Min      int                 `json:"min,omitempty"` // WIP limits; 0 = none
+	Max      int                 `json:"max,omitempty"`
 }
 
 // BoardColumnStatus references a status mapped to a column.

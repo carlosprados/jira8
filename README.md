@@ -226,6 +226,21 @@ out fails before anything is sent. `--comment` (or `--comment-file`, with
 `--markdown`) is added right after the transition: Jira silently drops a
 comment sent inside a transition that has no screen, so jira8 never does that.
 
+### Kanban boards
+
+```bash
+jira8 board list --project MYPROJ                       # id, type, name
+jira8 board view "Team Kanban" --project MYPROJ         # columns, issues in board order, WIP
+jira8 board view 110 --column "In Progress" --max 50    # one column
+jira8 board view 110 --assignee me --max 0              # your counts per column
+```
+
+`board view` reads the board as Jira draws it: its saved filter and kanban
+sub-filter (old Done issues stay hidden), its columns and their statuses, and
+the rank order. Each column shows its count and WIP limits, and is flagged
+`OVER MAX` / `OVER MIN` when the count (without sub-tasks, if the board says
+so) breaks them. `--max` limits the issues listed per column (default 10).
+
 ### Ranking (kanban order)
 
 Ranking changes the **vertical** position of an issue inside a board column. It

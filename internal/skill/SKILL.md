@@ -1,6 +1,6 @@
 ---
 name: jira8
-description: Read and change issues in a Jira Server 8 / Data Center instance from the shell with the `jira8` CLI — list and search (JQL), view with comments and change history, create, edit, transition, rank on a kanban board, link, assign, watch, comment, log work, attach files, manage Epics, and query a project's valid types, statuses and priorities. Load whenever the task mentions Jira, an issue key (ABC-123), tickets, bugs, stories, epics, sprints or kanban columns, worklogs or "imputar horas" in Jira, or turning notes into Jira issues. Use INSTEAD of calling the Jira REST API by hand.
+description: Read and change issues in a Jira Server 8 / Data Center instance from the shell with the `jira8` CLI — list and search (JQL), view with comments and change history, create, edit, transition, view kanban boards and rank on them, link, assign, watch, comment, log work, attach files, manage Epics, and query a project's valid types, statuses and priorities. Load whenever the task mentions Jira, an issue key (ABC-123), tickets, bugs, stories, epics, sprints or kanban columns, worklogs or "imputar horas" in Jira, or turning notes into Jira issues. Use INSTEAD of calling the Jira REST API by hand.
 ---
 
 # jira8 — Jira Server 8 from the shell
@@ -42,6 +42,7 @@ is coloured and may change. Every Jira command honours `-o json`, writes include
 | any write with `--dry-run` | `{dry_run: true, requests: [{method, path, body?, files?}]}` |
 | `markup md2wiki`, `markup wiki2md` | `{wiki}` / `{markdown}` |
 | `open` | `{key, url}` (does not launch a browser) |
+| `board list`, `board view` | `[{id, name, type}]`, `{board, columns: […]}` (see Kanban boards) |
 | `ping` | `{baseUrl, version, deploymentType, serverTitle, ms}` |
 | `config show` | `{file, auth, values: {url, project, user, token, password: {value?, set, source}}, problems: []}` |
 
@@ -252,17 +253,35 @@ jira8 issue edit ABC-123 --field customfield_10300='{"value":"Gold"}'
 - Projects can have hundreds of versions: `jq` the `allowed` list rather than
   reading it whole.
 
-## Kanban order
+## Kanban boards
 
 ```sh
+jira8 board list --project ABC -o json           # [{id, name, type}]
+jira8 board view "Team Kanban" --project ABC -o json
+jira8 board view 110 --column "In Progress" --max 50 -o json
+jira8 board view 110 --assignee me --max 0       # counts only
 jira8 issue rank ABC-123 --top                   # top of the column it is already in
 jira8 issue rank ABC-123 --before ABC-99         # or --after, --bottom
 jira8 issue rank ABC-1 ABC-2 --top --board "Team Kanban"
 ```
 
-Ranking changes the vertical position inside a column, never the status (that
-is a transition). It needs Jira Software. When the project has several boards,
-`--top`/`--bottom` require `--board` (id or name); the error lists them.
+- `board view` shows the board as Jira draws it: columns left to right, issues
+  in board order (top first), using the board's own filter and kanban
+  sub-filter (old Done issues stay hidden). JSON: `{board, columns: [{name,
+  total, min?, max?, wip, over?, issues: [{key, summary, type, status,
+  priority, assignee, url}]}]}`. `wip` is the count the limits apply to
+  (without sub-tasks when the board says so); `over` is `max` or `min` when it
+  breaks a limit. `--max` caps the issues listed per column (default 10, `0` =
+  counts only); `total` always counts the whole column.
+- A column is a set of statuses that differs per board: answer "what is in
+  column X" with `board view`, not with `issue list --status`.
+- With `--assignee`, counts are that person's and limits are not checked.
+- On a scrum board the sprint is ignored: columns show the whole board filter.
+- Without a board argument the project must have one board; otherwise the
+  error lists them (id, name, type).
+- Ranking changes the vertical position inside a column, never the status
+  (that is a transition). When the project has several boards, `--top` and
+  `--bottom` require `--board` (id or name). Boards need Jira Software.
 
 ## Epics
 
