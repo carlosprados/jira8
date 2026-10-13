@@ -71,17 +71,7 @@ func (c *Client) BoardView(ctx context.Context, req BoardViewRequest) (*BoardVie
 		}
 	}
 
-	scope := "filter = " + cfg.Filter.ID
-	if cfg.SubQuery != nil && strings.TrimSpace(cfg.SubQuery.Query) != "" {
-		scope += " AND (" + cfg.SubQuery.Query + ")"
-	}
-	if req.Assignee != "" {
-		if strings.EqualFold(req.Assignee, "me") {
-			scope += " AND assignee = currentUser()"
-		} else {
-			scope += " AND assignee = " + jqlQuote(req.Assignee)
-		}
-	}
+	scope := boardScope(cfg, req.Assignee)
 
 	var categories map[string]string
 	if req.Stale != "" || req.ByAssignee {
@@ -144,6 +134,22 @@ func (c *Client) BoardView(ctx context.Context, req BoardViewRequest) (*BoardVie
 		return nil, fmt.Errorf("column %q not on board %q; columns: %s", req.Column, board.Name, strings.Join(names, ", "))
 	}
 	return view, nil
+}
+
+// boardScope is the JQL of what a board shows: its saved filter, its kanban
+// sub-filter and, when given, one assignee ("me" = current user).
+func boardScope(cfg *models.BoardConfiguration, assignee string) string {
+	scope := "filter = " + cfg.Filter.ID
+	if cfg.SubQuery != nil && strings.TrimSpace(cfg.SubQuery.Query) != "" {
+		scope += " AND (" + cfg.SubQuery.Query + ")"
+	}
+	switch {
+	case strings.EqualFold(assignee, "me"):
+		scope += " AND assignee = currentUser()"
+	case assignee != "":
+		scope += " AND assignee = " + jqlQuote(assignee)
+	}
+	return scope
 }
 
 // inFlight reports whether a column holds work in progress: one of its

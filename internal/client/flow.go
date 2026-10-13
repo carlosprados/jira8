@@ -223,38 +223,10 @@ type flow struct {
 // the board counts in no column. ok is false when the issue never entered
 // the done column or its history cannot be read.
 func issueFlow(is models.Issue, colOf map[string]int, start, done int) (f flow, ok bool) {
-	type change struct {
-		at time.Time
-		to string
-	}
-	created, err := time.Parse(jiraTime, is.Fields.Created)
-	if err != nil {
+	timeline, ok := statusTimeline(is)
+	if !ok {
 		return f, false
 	}
-	var changes []change
-	initial := ""
-	if is.Changelog != nil {
-		for _, h := range is.Changelog.Histories {
-			for _, it := range h.Items {
-				if it.Field != "status" {
-					continue
-				}
-				at, err := time.Parse(jiraTime, h.Created)
-				if err != nil {
-					return f, false
-				}
-				if initial == "" && len(changes) == 0 {
-					initial = it.From
-				}
-				changes = append(changes, change{at, it.To})
-			}
-		}
-	}
-	slices.SortStableFunc(changes, func(a, b change) int { return a.at.Compare(b.at) })
-	if initial == "" && is.Fields.Status != nil {
-		initial = is.Fields.Status.ID
-	}
-	timeline := append([]change{{created, initial}}, changes...)
 
 	maxCols := 0
 	for _, i := range colOf {
@@ -263,32 +235,72 @@ func issueFlow(is models.Issue, colOf map[string]int, start, done int) (f flow, 
 	f.inColumn = make([]time.Duration, maxCols)
 	end := -1
 	for i, ch := range timeline {
-		if col, on := colOf[ch.to]; on && col == done {
+		if col, on := colOf[ch.To]; on && col == done {
 			end = i
 		}
 	}
 	if end < 0 {
 		return f, false
 	}
-	f.done = timeline[end].at
+	f.done = timeline[end].At
 	for i := 0; i < end; i++ {
-		col, on := colOf[timeline[i].to]
+		col, on := colOf[timeline[i].To]
 		if f.started == nil && on && col >= start {
-			t := timeline[i].at
+			t := timeline[i].At
 			f.started = &t
 		}
 		if f.started != nil && on {
-			f.inColumn[col] += timeline[i+1].at.Sub(timeline[i].at)
+			f.inColumn[col] += timeline[i+1].At.Sub(timeline[i].At)
 		}
 	}
 	return f, true
+}
+
+// statusChange is an issue entering status To at At.
+type statusChange struct {
+	At   time.Time
+	To   string
+	from string
+}
+
+// statusTimeline is an issue's statuses in order, from its creation: the
+// first entry is the status it was created in. ok is false when a date
+// cannot be read.
+func statusTimeline(is models.Issue) ([]statusChange, bool) {
+	created, err := time.Parse(jiraTime, is.Fields.Created)
+	if err != nil {
+		return nil, false
+	}
+	var changes []statusChange
+	if is.Changelog != nil {
+		for _, h := range is.Changelog.Histories {
+			for _, it := range h.Items {
+				if it.Field != "status" {
+					continue
+				}
+				at, err := time.Parse(jiraTime, h.Created)
+				if err != nil {
+					return nil, false
+				}
+				changes = append(changes, statusChange{At: at, To: it.To, from: it.From})
+			}
+		}
+	}
+	slices.SortStableFunc(changes, func(a, b statusChange) int { return a.At.Compare(b.At) })
+	initial := ""
+	if len(changes) > 0 {
+		initial = changes[0].from
+	} else if is.Fields.Status != nil {
+		initial = is.Fields.Status.ID
+	}
+	return append([]statusChange{{At: created, To: initial}}, changes...), true
 }
 
 // searchWithChangelog runs a search with each issue's history.
 func (c *Client) searchWithChangelog(ctx context.Context, jql string) ([]models.Issue, error) {
 	var all []models.Issue
 	for startAt := 0; ; {
-		path := fmt.Sprintf("/search?jql=%s&startAt=%d&maxResults=%d&fields=summary,status,issuetype,created&expand=changelog",
+		path := fmt.Sprintf("/search?jql=%s&startAt=%d&maxResults=%d&fields=summary,status,issuetype,created,assignee,priority&expand=changelog",
 			url.QueryEscape(jql), startAt, pageSize)
 		data, err := c.do(ctx, http.MethodGet, path, nil)
 		if err != nil {

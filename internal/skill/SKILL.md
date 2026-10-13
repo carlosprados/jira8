@@ -45,6 +45,7 @@ is coloured and may change. Every Jira command honours `-o json`, writes include
 | `board list`, `board view` | `[{id, name, type}]`, `{board, columns: […]}` (see Kanban boards) |
 | `board view --by-assignee` | `{board, columns: [names], assignees: [{assignee, name, total, stale?, columns: {name: n}, keys}]}` |
 | `board flow` | `{board, from, to, startColumn, doneColumn, throughput, weekly, cycleTime, columns, issues}` (see Kanban boards) |
+| `board aging` | `{board, at, startColumn, columns: [names], cards: [{key, summary, column, status, type, priority, assignee, assigneeName, inColumnSince, inColumnDays, started?, ageDays?, url}]}` |
 | `issue move` | `{key, board, column, moved, status, …}` (see Kanban boards) |
 | `ping` | `{baseUrl, version, deploymentType, serverTitle, ms}` |
 | `config show` | `{file, auth, values: {url, project, user, token, password: {value?, set, source}}, problems: []}` |
@@ -267,6 +268,7 @@ jira8 board view 110 --stale 7d -o json          # what is stuck?
 jira8 board view 110 --by-assignee --stale 7d    # work in progress per person
 jira8 board flow 110 --since 30d -o json         # throughput, cycle time, time per column
 jira8 board flow 110 --start-column "In Progress" --issues
+jira8 board aging 110 --older-than 14d -o json   # how old is the work in progress?
 jira8 issue move ABC-123 --column "In Progress" --top
 jira8 issue move ABC-123 --column Done --field "Resolution=Fixed" --comment "…" --board "Team Kanban"
 jira8 issue rank ABC-123 --top                   # top of the column it is already in
@@ -305,6 +307,13 @@ jira8 issue rank ABC-1 ABC-2 --top --board "Team Kanban"
   that skipped straight to done count in `throughput` only. It uses the board
   filter without the kanban sub-filter, and reads each issue's history: long
   periods on busy boards are slow.
+- **`board aging`** lists the cards of the in-progress columns, oldest in
+  their column first: `inColumnDays` since the card last entered its column
+  (status changes inside a column do not reset it) and `ageDays` since its
+  work started (same start rule as `board flow`; absent when it never
+  reached the start column). Filters: `--column`, `--assignee`,
+  `--older-than 14d`, `--start-column`. An age above `board flow`'s cycle
+  time p85 means the card is already slower than 85% of finished ones.
 - **`issue move`** is dragging a card: it finds the transition available now
   that leads into the column, runs it (`--field`, `--comment` as in
   `transition`) and with `--top`/`--bottom` ranks it at that end of the
