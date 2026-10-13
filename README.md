@@ -159,6 +159,9 @@ see [Markdown and Wiki Markup](#markdown-and-wiki-markup).
 jira8 issue edit MYPROJ-123 --summary "Updated title"
 jira8 issue edit MYPROJ-123 --assignee john.doe --priority Medium
 jira8 issue edit MYPROJ-123 --assignee ""              # unassign
+jira8 issue assign MYPROJ-123 jdoe                     # assign only (needs just the Assign permission)
+jira8 issue watch MYPROJ-123                           # watch / unwatch it (you, or a user as 2nd arg)
+jira8 issue watchers MYPROJ-123
 jira8 issue edit MYPROJ-123 --epic-link MYPROJ-42      # link to Epic
 jira8 issue edit MYPROJ-123 --epic-link ""             # detach from Epic
 jira8 issue edit MYPROJ-123 --due-date 2026-09-24 --original-estimate 5d
