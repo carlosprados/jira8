@@ -92,6 +92,14 @@ JIRA_PROJECT=OTHER jira8 issue list               # per-command via env
 export JIRA_PROJECT=OTHER && jira8 issue list     # per-session
 ```
 
+To see what is actually in play, and whether it works:
+
+```bash
+jira8 config show     # file read, each value and where it came from, problems (secrets redacted)
+jira8 ping            # Jira version, base URL and latency (no login needed)
+jira8 user me         # the authenticated user: checks the credentials
+```
+
 ## Usage
 
 ### List issues

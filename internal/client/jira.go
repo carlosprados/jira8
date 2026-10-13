@@ -333,6 +333,19 @@ func (c *Client) LinkIssues(ctx context.Context, req *models.IssueLinkRequest) e
 	return err
 }
 
+// ServerInfo returns the server version and base URL.
+func (c *Client) ServerInfo(ctx context.Context) (*models.ServerInfo, error) {
+	data, err := c.do(ctx, http.MethodGet, "/serverInfo", nil)
+	if err != nil {
+		return nil, err
+	}
+	var info models.ServerInfo
+	if err := json.Unmarshal(data, &info); err != nil {
+		return nil, fmt.Errorf("parsing server info: %w", err)
+	}
+	return &info, nil
+}
+
 // GetIssueLinks returns the links of an issue (fields.issuelinks).
 func (c *Client) GetIssueLinks(ctx context.Context, key string) ([]models.IssueLink, error) {
 	data, err := c.do(ctx, http.MethodGet, "/issue/"+url.PathEscape(key)+"?fields=issuelinks", nil)
