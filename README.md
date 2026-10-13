@@ -233,7 +233,13 @@ jira8 board list --project MYPROJ                       # id, type, name
 jira8 board view "Team Kanban" --project MYPROJ         # columns, issues in board order, WIP
 jira8 board view 110 --column "In Progress" --max 50    # one column
 jira8 board view 110 --assignee me --max 0              # your counts per column
+jira8 board view 110 --stale 7d                         # flag cards stuck for a week
+jira8 issue move MYPROJ-1 --column "In Progress" --top  # drag a card: transition + rank
 ```
+
+`issue move` finds the transition that leads into the column, runs it (with
+`--field` and `--comment` as in `issue transition`) and optionally ranks the
+card at the top or bottom. `--stale` checks only in-progress columns.
 
 `board view` reads the board as Jira draws it: its saved filter and kanban
 sub-filter (old Done issues stay hidden), its columns and their statuses, and

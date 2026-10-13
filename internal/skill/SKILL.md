@@ -43,6 +43,7 @@ is coloured and may change. Every Jira command honours `-o json`, writes include
 | `markup md2wiki`, `markup wiki2md` | `{wiki}` / `{markdown}` |
 | `open` | `{key, url}` (does not launch a browser) |
 | `board list`, `board view` | `[{id, name, type}]`, `{board, columns: […]}` (see Kanban boards) |
+| `issue move` | `{key, board, column, moved, status, …}` (see Kanban boards) |
 | `ping` | `{baseUrl, version, deploymentType, serverTitle, ms}` |
 | `config show` | `{file, auth, values: {url, project, user, token, password: {value?, set, source}}, problems: []}` |
 
@@ -260,6 +261,9 @@ jira8 board list --project ABC -o json           # [{id, name, type}]
 jira8 board view "Team Kanban" --project ABC -o json
 jira8 board view 110 --column "In Progress" --max 50 -o json
 jira8 board view 110 --assignee me --max 0       # counts only
+jira8 board view 110 --stale 7d -o json          # what is stuck?
+jira8 issue move ABC-123 --column "In Progress" --top
+jira8 issue move ABC-123 --column Done --field "Resolution=Fixed" --comment "…" --board "Team Kanban"
 jira8 issue rank ABC-123 --top                   # top of the column it is already in
 jira8 issue rank ABC-123 --before ABC-99         # or --after, --bottom
 jira8 issue rank ABC-1 ABC-2 --top --board "Team Kanban"
@@ -276,6 +280,18 @@ jira8 issue rank ABC-1 ABC-2 --top --board "Team Kanban"
 - A column is a set of statuses that differs per board: answer "what is in
   column X" with `board view`, not with `issue list --status`.
 - With `--assignee`, counts are that person's and limits are not checked.
+- `--stale 7d` (also `2w`, `12h`) marks the cards whose status has not changed
+  for that long (`stale: true`, and `stale: N` per column), only in
+  in-progress columns: to-do and done columns are expected to wait. Cards
+  created within the period are not counted.
+- **`issue move`** is dragging a card: it finds the transition available now
+  that leads into the column, runs it (`--field`, `--comment` as in
+  `transition`) and with `--top`/`--bottom` ranks it at that end of the
+  column. Already in the column: no transition, only the rank (`moved:
+  false`). Several transitions into the column, or none: the error lists
+  them; then use `issue transition --to`. JSON: `{key, board, column, moved,
+  status, transition?, rank?, anchor?, comment?}`. Prefer it to `transition`
+  when the user speaks of columns.
 - On a scrum board the sprint is ignored: columns show the whole board filter.
 - Without a board argument the project must have one board; otherwise the
   error lists them (id, name, type).

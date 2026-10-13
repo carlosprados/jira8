@@ -44,6 +44,10 @@ type RankRequest struct {
 	// Board is an optional board ID or name, only consulted by RankTop /
 	// RankBottom. When empty, the issue's project must have exactly one board.
 	Board string
+	// StatusID, when set, replaces the issue's current status to pick the
+	// column for RankTop / RankBottom: the column it is about to enter (a dry
+	// run has not moved it yet).
+	StatusID string
 }
 
 // RankResult reports what a ranking operation did, including the anchor it
@@ -185,6 +189,9 @@ func (c *Client) resolveColumnAnchor(ctx context.Context, req RankRequest, resul
 		return 0, fmt.Errorf("cannot determine the status of %s", req.Keys[0])
 	}
 	statusID, statusName := issue.Fields.Status.ID, issue.Fields.Status.Name
+	if req.StatusID != "" {
+		statusID, statusName = req.StatusID, "id "+req.StatusID
+	}
 
 	projectKey := ""
 	if issue.Fields.Project != nil {
