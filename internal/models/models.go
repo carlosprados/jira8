@@ -54,22 +54,24 @@ type HistoryItem struct {
 // Raw preserves the raw JSON payload so callers can look up custom fields (e.g.
 // customfield_10011 for Epic Name) by ID without the model knowing them upfront.
 type IssueFields struct {
-	Summary     string          `json:"summary"`
-	Description string          `json:"description,omitempty"`
-	Status      *Status         `json:"status,omitempty"`
-	IssueType   *IssueType      `json:"issuetype,omitempty"`
-	Priority    *Priority       `json:"priority,omitempty"`
-	Assignee    *User           `json:"assignee,omitempty"`
-	Reporter    *User           `json:"reporter,omitempty"`
-	Project     *Project        `json:"project,omitempty"`
-	Parent      *ParentIssue    `json:"parent,omitempty"`
-	Created     string          `json:"created,omitempty"`
-	Updated     string          `json:"updated,omitempty"`
-	Labels      []string        `json:"labels,omitempty"`
-	Components  []Component     `json:"components,omitempty"`
-	Comment     *Comments       `json:"comment,omitempty"`
-	Attachment  []Attachment    `json:"attachment,omitempty"`
-	Raw         json.RawMessage `json:"-"`
+	Summary     string            `json:"summary"`
+	Description string            `json:"description,omitempty"`
+	Status      *Status           `json:"status,omitempty"`
+	IssueType   *IssueType        `json:"issuetype,omitempty"`
+	Priority    *Priority         `json:"priority,omitempty"`
+	Assignee    *User             `json:"assignee,omitempty"`
+	Reporter    *User             `json:"reporter,omitempty"`
+	Project     *Project          `json:"project,omitempty"`
+	Parent      *ParentIssue      `json:"parent,omitempty"`
+	Created     string            `json:"created,omitempty"`
+	Updated     string            `json:"updated,omitempty"`
+	Labels      []string          `json:"labels,omitempty"`
+	Components  []Component       `json:"components,omitempty"`
+	Comment     *Comments         `json:"comment,omitempty"`
+	Attachment  []Attachment      `json:"attachment,omitempty"`
+	IssueLinks  []IssueLink       `json:"issuelinks,omitempty"`
+	Worklog     *WorklogsResponse `json:"worklog,omitempty"` // first 20 only, see Total
+	Raw         json.RawMessage   `json:"-"`
 }
 
 // UnmarshalJSON stores the full raw payload in Raw while decoding the typed fields.

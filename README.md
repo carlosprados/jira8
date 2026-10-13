@@ -132,6 +132,10 @@ jira8 issue view MYPROJ-123 -o json
 jira8 issue view MYPROJ-123 --with-history       # + History: who changed which field, when
 ```
 
+The text view shows the fields, description, links, attachments, the worklog
+total with its latest entries, the last comments and, with `--with-history`,
+the history. `-o json` carries all of it in full.
+
 History values longer than 200 characters or spanning several lines (typically
 description edits, which store the whole text every time) are trimmed to their
 first line plus `… (N chars)`. With `-o json` they come back in full.

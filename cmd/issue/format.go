@@ -189,6 +189,15 @@ func printIssueDetailWithEpic(issue *models.Issue, epicNameID, epicLinkID string
 		fmt.Println(f.Description)
 	}
 
+	if len(f.IssueLinks) > 0 {
+		fmt.Println()
+		fmt.Printf(labelStyle.Render("Links (%d):")+"\n", len(f.IssueLinks))
+		for _, l := range f.IssueLinks {
+			r := linkRow(l)
+			fmt.Printf("  %s %s  %s  %s\n", r.Phrase, keyStyle.Render(r.Key), colorStatus(r.Status), truncate(r.Summary, 60))
+		}
+	}
+
 	if len(f.Attachment) > 0 {
 		fmt.Println()
 		fmt.Printf(labelStyle.Render("Attachments (%d):")+"\n", len(f.Attachment))
@@ -199,6 +208,10 @@ func printIssueDetailWithEpic(issue *models.Issue, epicNameID, epicLinkID string
 				labelStyle.Render(humanSize(att.Size)),
 			)
 		}
+	}
+
+	if f.Worklog != nil && len(f.Worklog.Worklogs) > 0 {
+		printWorklogSummary(f.Worklog)
 	}
 
 	if f.Comment != nil && len(f.Comment.Comments) > 0 {
@@ -220,6 +233,54 @@ func printIssueDetailWithEpic(issue *models.Issue, epicNameID, epicLinkID string
 	}
 
 	fmt.Println()
+}
+
+// printWorklogSummary shows the total logged and the latest entries. Jira
+// embeds at most 20 worklogs in the issue; the total counts all of them.
+func printWorklogSummary(w *models.WorklogsResponse) {
+	const last = 5
+	secs := 0
+	for _, wl := range w.Worklogs {
+		secs += wl.TimeSpentSecs
+	}
+	fmt.Println()
+	entries := "1 entry"
+	if w.Total != 1 {
+		entries = fmt.Sprintf("%d entries", w.Total)
+	}
+	header := fmt.Sprintf("Worklog (%s, %s logged):", entries, humanDuration(secs))
+	if w.Total > len(w.Worklogs) {
+		header = fmt.Sprintf("Worklog (%s; %s in the first %d, see worklog-list):", entries, humanDuration(secs), len(w.Worklogs))
+	}
+	fmt.Println(labelStyle.Render(header))
+	start := max(len(w.Worklogs)-last, 0)
+	for _, wl := range w.Worklogs[start:] {
+		line := fmt.Sprintf("  %-6s  %s  %s", wl.TimeSpent, labelStyle.Render(dateOnly(wl.Started)), userName(wl.Author))
+		if c := strings.TrimSpace(strings.SplitN(wl.Comment, "\n", 2)[0]); c != "" {
+			line += "  " + truncate(c, 50)
+		}
+		fmt.Println(line)
+	}
+}
+
+// humanDuration renders seconds as hours and minutes ("11h 30m"): no 8-hour
+// days, which read ambiguously.
+func humanDuration(secs int) string {
+	h, m := secs/3600, secs%3600/60
+	switch {
+	case h == 0:
+		return fmt.Sprintf("%dm", m)
+	case m == 0:
+		return fmt.Sprintf("%dh", h)
+	}
+	return fmt.Sprintf("%dh %dm", h, m)
+}
+
+func dateOnly(ts string) string {
+	if len(ts) >= 10 {
+		return ts[:10]
+	}
+	return ts
 }
 
 // humanSize renders a byte count as a short human-readable string (e.g. "12.3 KB").
