@@ -40,11 +40,15 @@ have a single board. --max limits the issues listed per column (0 = counts
 only); the counts always cover the whole column.
 
 --stale 7d flags the cards whose status has not changed for 7 days, in the
-in-progress columns only (to-do and done columns are expected to wait).`,
+in-progress columns only (to-do and done columns are expected to wait).
+
+--by-assignee counts the work in progress per person instead: every card of
+the in-progress columns, one row per assignee (stale ones too with --stale).`,
 	Example: `  jira8 board view "Team Kanban" --project ABC
   jira8 board view 110 --column "In Progress"
   jira8 board view 110 --assignee me --max 50 -o json
-  jira8 board view 110 --stale 7d                 # what is stuck?`,
+  jira8 board view 110 --stale 7d                 # what is stuck?
+  jira8 board view 110 --by-assignee --stale 7d   # who carries how much`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: runView,
 }
@@ -56,7 +60,9 @@ func init() {
 	viewCmd.Flags().String("assignee", "", "Only issues of this user ('me' for you)")
 	viewCmd.Flags().Int("max", 10, "Issues listed per column (0 = counts only)")
 	viewCmd.Flags().String("stale", "", "Flag in-progress cards whose status has not changed for this long (7d, 2w, 12h)")
-	BoardCmd.AddCommand(listCmd, viewCmd)
+	viewCmd.Flags().Bool("by-assignee", false, "Count the in-progress cards per assignee")
+	viewCmd.MarkFlagsMutuallyExclusive("by-assignee", "assignee")
+	BoardCmd.AddCommand(listCmd, viewCmd, flowCmd)
 }
 
 var (
@@ -116,6 +122,7 @@ func runView(cmd *cobra.Command, args []string) error {
 	req.Column, _ = cmd.Flags().GetString("column")
 	req.Assignee, _ = cmd.Flags().GetString("assignee")
 	req.Max, _ = cmd.Flags().GetInt("max")
+	req.ByAssignee, _ = cmd.Flags().GetBool("by-assignee")
 	if stale, _ := cmd.Flags().GetString("stale"); stale != "" {
 		period, err := stalePeriod(stale)
 		if err != nil {
@@ -127,6 +134,10 @@ func runView(cmd *cobra.Command, args []string) error {
 	view, err := app.Get().Client.BoardView(context.Background(), req)
 	if err != nil {
 		return err
+	}
+
+	if req.ByAssignee {
+		return printByAssignee(view)
 	}
 
 	cols := make([]columnOut, len(view.Columns))

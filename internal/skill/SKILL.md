@@ -43,6 +43,8 @@ is coloured and may change. Every Jira command honours `-o json`, writes include
 | `markup md2wiki`, `markup wiki2md` | `{wiki}` / `{markdown}` |
 | `open` | `{key, url}` (does not launch a browser) |
 | `board list`, `board view` | `[{id, name, type}]`, `{board, columns: […]}` (see Kanban boards) |
+| `board view --by-assignee` | `{board, columns: [names], assignees: [{assignee, name, total, stale?, columns: {name: n}, keys}]}` |
+| `board flow` | `{board, from, to, startColumn, doneColumn, throughput, weekly, cycleTime, columns, issues}` (see Kanban boards) |
 | `issue move` | `{key, board, column, moved, status, …}` (see Kanban boards) |
 | `ping` | `{baseUrl, version, deploymentType, serverTitle, ms}` |
 | `config show` | `{file, auth, values: {url, project, user, token, password: {value?, set, source}}, problems: []}` |
@@ -262,6 +264,9 @@ jira8 board view "Team Kanban" --project ABC -o json
 jira8 board view 110 --column "In Progress" --max 50 -o json
 jira8 board view 110 --assignee me --max 0       # counts only
 jira8 board view 110 --stale 7d -o json          # what is stuck?
+jira8 board view 110 --by-assignee --stale 7d    # work in progress per person
+jira8 board flow 110 --since 30d -o json         # throughput, cycle time, time per column
+jira8 board flow 110 --start-column "In Progress" --issues
 jira8 issue move ABC-123 --column "In Progress" --top
 jira8 issue move ABC-123 --column Done --field "Resolution=Fixed" --comment "…" --board "Team Kanban"
 jira8 issue rank ABC-123 --top                   # top of the column it is already in
@@ -284,6 +289,22 @@ jira8 issue rank ABC-1 ABC-2 --top --board "Team Kanban"
   for that long (`stale: true`, and `stale: N` per column), only in
   in-progress columns: to-do and done columns are expected to wait. Cards
   created within the period are not counted.
+- `--by-assignee` replaces the columns with one row per person: every card of
+  the in-progress columns (all of them, `--max` does not apply), per column,
+  plus `stale` with `--stale`. Unassigned cards have `assignee: ""`. Not with
+  `--assignee`.
+- **`board flow`** measures what reached the done column (the last one) in
+  `--since` (default `30d`): `throughput` and `weekly: [{week (Monday),
+  count, partial?}]`; `cycleTime: {count, p50, p85, max}` in calendar days
+  from the first entry into the start column (default: first in-progress
+  column; `--start-column`) or any later one, to the last entry into done;
+  `columns: [{name, days, share (%), perIssue: {count, p50, p85, max}}]` for
+  the columns from start to before done (and earlier ones cards were sent
+  back to); `issues: [{key, summary, type,
+  started?, done, cycleDays?, url}]` (`--issues` lists them in text). Issues
+  that skipped straight to done count in `throughput` only. It uses the board
+  filter without the kanban sub-filter, and reads each issue's history: long
+  periods on busy boards are slow.
 - **`issue move`** is dragging a card: it finds the transition available now
   that leads into the column, runs it (`--field`, `--comment` as in
   `transition`) and with `--top`/`--bottom` ranks it at that end of the
@@ -341,7 +362,7 @@ command usage. The exit code tells what failed:
 |---|---|---|
 | 0 | done (also a `--dry-run`) | |
 | 1 | jira8 refused before sending: unknown name, missing required field, no project, config, file | read the message, fix the input |
-| 2 | usage: unknown command or flag, wrong arguments | check `--help` |
+| 2 | usage: unknown command or flag, wrong arguments, missing required or conflicting flags | check `--help` |
 | 3 | Jira said 401/403: credentials or permission | tell the user |
 | 4 | Jira said 404 | check the key or id; it may be invisible to the user |
 | 5 | Jira rejected the request (400, 409, other 4xx) | read the message below |

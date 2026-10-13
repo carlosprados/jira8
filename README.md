@@ -234,12 +234,21 @@ jira8 board view "Team Kanban" --project MYPROJ         # columns, issues in boa
 jira8 board view 110 --column "In Progress" --max 50    # one column
 jira8 board view 110 --assignee me --max 0              # your counts per column
 jira8 board view 110 --stale 7d                         # flag cards stuck for a week
+jira8 board view 110 --by-assignee --stale 7d           # work in progress per person
+jira8 board flow 110 --since 30d                        # throughput, cycle time p50/p85, time per column
 jira8 issue move MYPROJ-1 --column "In Progress" --top  # drag a card: transition + rank
 ```
 
 `issue move` finds the transition that leads into the column, runs it (with
 `--field` and `--comment` as in `issue transition`) and optionally ranks the
 card at the top or bottom. `--stale` checks only in-progress columns.
+`--by-assignee` counts the cards of those columns per person.
+
+`board flow` measures the issues that reached the last column in the period:
+throughput per week, cycle time (calendar days from the first in-progress
+column, or `--start-column`, to done) as p50/p85/max, and how that time splits
+across the columns. It reads each issue's history, without the board's kanban
+sub-filter so older done issues count.
 
 `board view` reads the board as Jira draws it: its saved filter and kanban
 sub-filter (old Done issues stay hidden), its columns and their statuses, and
@@ -379,7 +388,7 @@ jira8 open MYPROJ-123 -o json    # {key, url}, no browser
 |---|---|
 | 0 | success (also a `--dry-run`) |
 | 1 | refused by jira8 before sending: unknown name, missing required field, no project, config, file |
-| 2 | usage: unknown command or flag, wrong arguments |
+| 2 | usage: unknown command or flag, wrong arguments, missing required or conflicting flags |
 | 3 | authentication or permission (401, 403) |
 | 4 | not found (404) |
 | 5 | rejected by Jira (400, 409, other 4xx) |

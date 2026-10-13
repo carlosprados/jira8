@@ -18,6 +18,9 @@ type BoardViewRequest struct {
 	Assignee string // only issues of this user ("me" = current user)
 	Max      int    // issues listed per column; the count covers them all
 	Stale    string // JQL period (-7d): flag in-flight cards whose status is older
+	// ByAssignee keeps only the in-progress columns, with all their issues
+	// (Max is ignored), to count work in progress per person.
+	ByAssignee bool
 }
 
 // BoardView is a board's columns with their issues in board order.
@@ -81,7 +84,7 @@ func (c *Client) BoardView(ctx context.Context, req BoardViewRequest) (*BoardVie
 	}
 
 	var categories map[string]string
-	if req.Stale != "" {
+	if req.Stale != "" || req.ByAssignee {
 		if categories, err = c.StatusCategories(ctx); err != nil {
 			return nil, err
 		}
@@ -94,14 +97,25 @@ func (c *Client) BoardView(ctx context.Context, req BoardViewRequest) (*BoardVie
 		if req.Column != "" && !strings.EqualFold(col.Name, req.Column) {
 			continue
 		}
+		if req.ByAssignee && !inFlight(&col, categories) {
+			continue
+		}
 		bc := BoardColumn{Name: col.Name, Min: col.Min, Max: col.Max}
 		if len(col.Statuses) > 0 {
 			in := scope + " AND status IN (" + quoteJoin(columnStatusIDs(&col)) + ")"
-			res, err := c.SearchIssues(ctx, fmt.Sprintf("%s ORDER BY cf[%d] ASC", in, rankField), 0, max(req.Max, 0))
+			ranked := fmt.Sprintf("%s ORDER BY cf[%d] ASC", in, rankField)
+			if req.ByAssignee {
+				bc.Issues, bc.Total, err = c.SearchAllIssues(ctx, ranked, 0)
+			} else {
+				var res *models.SearchResult
+				if res, err = c.SearchIssues(ctx, ranked, 0, max(req.Max, 0)); err == nil {
+					bc.Total, bc.Issues = res.Total, res.Issues
+				}
+			}
 			if err != nil {
 				return nil, fmt.Errorf("column %q: %w", col.Name, err)
 			}
-			bc.Total, bc.Issues, bc.WIP = res.Total, res.Issues, res.Total
+			bc.WIP = bc.Total
 			if (col.Min > 0 || col.Max > 0) && cfg.ColumnConfig.ConstraintType == "issueCountExclSubs" {
 				res, err := c.SearchIssues(ctx, in+" AND issuetype NOT IN subTaskIssueTypes()", 0, 0)
 				if err != nil {
@@ -143,30 +157,18 @@ func inFlight(col *models.BoardColumn, categories map[string]string) bool {
 	return false
 }
 
-// markStale counts the column's cards whose status has not changed within
-// period, and flags those among the listed ones. Cards created within the
-// period never had the chance to move, so they do not count.
+// markStale counts and flags the column's cards whose status has not changed
+// within period. Cards created within the period never had the chance to
+// move, so they do not count.
 func (c *Client) markStale(ctx context.Context, bc *BoardColumn, in, period string) error {
 	stale := in + " AND NOT status CHANGED AFTER " + period + " AND created < " + period
-	res, err := c.SearchIssues(ctx, stale, 0, 0)
+	issues, n, err := c.SearchAllIssues(ctx, stale, 0)
 	if err != nil {
 		return err
 	}
-	n := res.Total
 	bc.Stale = &n
-	if n == 0 || len(bc.Issues) == 0 {
-		return nil
-	}
-	keys := make([]string, len(bc.Issues))
-	for i, is := range bc.Issues {
-		keys[i] = is.Key
-	}
-	res, err = c.SearchIssues(ctx, stale+" AND key IN ("+strings.Join(keys, ", ")+")", 0, len(keys))
-	if err != nil {
-		return err
-	}
-	bc.StaleKeys = map[string]bool{}
-	for _, is := range res.Issues {
+	bc.StaleKeys = make(map[string]bool, n)
+	for _, is := range issues {
 		bc.StaleKeys[is.Key] = true
 	}
 	return nil
