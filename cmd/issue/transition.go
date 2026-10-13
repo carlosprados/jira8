@@ -32,10 +32,7 @@ var transitionsCmd = &cobra.Command{
 
 func init() {
 	transitionCmd.Flags().String("to", "", "Target transition name (required)")
-	transitionCmd.Flags().StringArray("field", nil, `Set a field on the transition screen, e.g. "Resolution=Fixed" (repeatable; see 'issue transitions')`)
-	transitionCmd.Flags().String("comment", "", "Add a comment after the transition")
-	transitionCmd.Flags().String("comment-file", "", "Read the comment from file (use - for stdin)")
-	transitionCmd.Flags().Bool("markdown", false, "Treat --comment as Markdown and convert it to Jira Wiki Markup; local images (![alt](path)) are attached to the issue")
+	addTransitionFlags(transitionCmd)
 	_ = transitionCmd.MarkFlagRequired("to")
 }
 
@@ -55,29 +52,54 @@ func runTransition(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("transition %q not found; available: %s", to, strings.Join(app.Names(transitions, transitionName), ", "))
 	}
 
-	fields, err := transitionFields(cmd, match)
+	out, uploaded, err := performTransition(cmd, key, match)
 	if err != nil {
 		return err
+	}
+	if err := app.Done(out, "Transitioned %s → %s", key, out["status"]); err != nil {
+		return err
+	}
+	if a.Output != "json" {
+		app.PrintUploadedImages(uploaded)
+	}
+	return nil
+}
+
+// addTransitionFlags registers the flags performTransition reads.
+func addTransitionFlags(c *cobra.Command) {
+	c.Flags().StringArray("field", nil, `Set a field on the transition screen, e.g. "Resolution=Fixed" (repeatable; see 'issue transitions')`)
+	c.Flags().String("comment", "", "Add a comment after the transition")
+	c.Flags().String("comment-file", "", "Read the comment from file (use - for stdin)")
+	c.Flags().Bool("markdown", false, "Treat --comment as Markdown and convert it to Jira Wiki Markup; local images (![alt](path)) are attached to the issue")
+}
+
+// performTransition runs transition t with the screen fields and comment of
+// the command's flags. It returns the JSON answer and the images uploaded.
+func performTransition(cmd *cobra.Command, key string, t *models.Transition) (map[string]any, []models.Attachment, error) {
+	a := app.Get()
+	fields, err := transitionFields(cmd, t)
+	if err != nil {
+		return nil, nil, err
 	}
 	comment, err := app.ReadBody(cmd, "comment", "comment-file")
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 	uploaded, err := app.UploadImages(context.Background(), key, comment.Images)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 
-	req := &models.TransitionRequest{Transition: models.TransitionRef{ID: match.ID}, Fields: fields}
+	req := &models.TransitionRequest{Transition: models.TransitionRef{ID: t.ID}, Fields: fields}
 	if err := a.Client.DoTransition(context.Background(), key, req); err != nil {
-		return err
+		return nil, nil, err
 	}
 
-	target := to
-	if match.To != nil {
-		target = match.To.Name
+	target := t.Name
+	if t.To != nil {
+		target = t.To.Name
 	}
-	out := map[string]any{"key": key, "transition": match.Name, "status": target}
+	out := map[string]any{"key": key, "transition": t.Name, "status": target}
 	if len(fields) > 0 {
 		out["updated"] = app.UpdatedFields(fields, nil)
 	}
@@ -89,17 +111,11 @@ func runTransition(cmd *cobra.Command, args []string) error {
 	if comment.Set && comment.Text != "" {
 		c, err := a.Client.AddComment(context.Background(), key, &models.AddCommentRequest{Body: comment.Text})
 		if err != nil {
-			return fmt.Errorf("transitioned %s to %s but failed to add the comment: %w", key, target, err)
+			return nil, nil, fmt.Errorf("transitioned %s to %s but failed to add the comment: %w", key, target, err)
 		}
 		out["comment"] = c.ID
 	}
-	if err := app.Done(out, "Transitioned %s → %s", key, target); err != nil {
-		return err
-	}
-	if a.Output != "json" {
-		app.PrintUploadedImages(uploaded)
-	}
-	return nil
+	return out, uploaded, nil
 }
 
 // transitionFields resolves --field against the transition screen and checks
