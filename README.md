@@ -111,8 +111,18 @@ jira8 issue list --assignee me                # assigned to current user
 jira8 issue list --type Story                 # filter by issue type
 jira8 issue list --epic MYPROJ-42             # issues linked to this Epic
 jira8 issue list --jql "project = MYPROJ AND priority = High"
-jira8 issue list --max 100                    # up to 100 results
+jira8 issue list --label backend --label urgent   # all of these labels
+jira8 issue list --reporter me --priority Major --component API
+jira8 issue list --text "timeout"             # summary, description, comments
+jira8 issue list --updated-after -7d          # or --created-after 2026-10-01
+jira8 issue list --sort created --asc         # created, updated, priority, key, rank
+jira8 issue list --max 100                    # up to 100 results (default 50)
+jira8 issue list --all                        # every match
+jira8 issue list --fields labels,components -o json   # extra fields by id
 ```
+
+Filters combine with AND; `--jql` replaces them. When more issues match than
+are shown, a note on stderr says how many.
 
 ### View issue
 

@@ -48,7 +48,7 @@ func runList(cmd *cobra.Command, args []string) error {
 		extra = append(extra, epicNameID)
 	}
 
-	issues, err := a.Client.SearchAllIssues(context.Background(), jql, max, extra...)
+	issues, _, err := a.Client.SearchAllIssues(context.Background(), jql, max, extra...)
 	if err != nil {
 		return err
 	}

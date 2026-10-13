@@ -28,7 +28,7 @@ func runChildren(cmd *cobra.Command, args []string) error {
 	max, _ := cmd.Flags().GetInt("max")
 
 	jql := client.BuildJQLWith(client.JQLFilters{Epic: key})
-	issues, err := a.Client.SearchAllIssues(context.Background(), jql, max)
+	issues, _, err := a.Client.SearchAllIssues(context.Background(), jql, max)
 	if err != nil {
 		return err
 	}

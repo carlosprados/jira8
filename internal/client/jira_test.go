@@ -47,6 +47,12 @@ func TestBuildJQLWith(t *testing.T) {
 			filters: JQLFilters{Project: "ESA", Status: "In Progress", Type: "Story", Epic: "ESA-42"},
 			want:    `project = ESA AND status = "In Progress" AND issuetype = "Story" AND "Epic Link" = ESA-42 ORDER BY updated DESC`,
 		},
+		{
+			name: "new filters, escaping and sort",
+			filters: JQLFilters{Reporter: "me", Priority: "Major", Component: "API", Labels: []string{"a", "b"},
+				Text: `say "hi"`, CreatedAfter: "-7d", UpdatedAfter: "2026-10-01", Sort: "rank", Asc: true},
+			want: `reporter = currentUser() AND priority = "Major" AND component = "API" AND labels = "a" AND labels = "b" AND text ~ "say \"hi\"" AND created >= "-7d" AND updated >= "2026-10-01" ORDER BY Rank ASC`,
+		},
 	}
 
 	for _, tc := range tests {

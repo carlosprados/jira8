@@ -42,7 +42,7 @@ func runView(cmd *cobra.Command, args []string) error {
 	var children []models.Issue
 	if !skipChildren {
 		jql := client.BuildJQLWith(client.JQLFilters{Epic: key})
-		children, err = a.Client.SearchAllIssues(context.Background(), jql, maxChildren)
+		children, _, err = a.Client.SearchAllIssues(context.Background(), jql, maxChildren)
 		if err != nil {
 			return fmt.Errorf("fetching children: %w", err)
 		}
