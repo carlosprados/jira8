@@ -66,15 +66,19 @@ type ColumnTime struct {
 }
 
 // FlowIssue is one finished issue. Started is nil when it skipped every
-// column from the start column on (straight from to-do to done).
+// column from the start column on (straight from to-do to done). The
+// assignee is the current one, as in board aging.
 type FlowIssue struct {
-	Key       string     `json:"key"`
-	Summary   string     `json:"summary"`
-	Type      string     `json:"type,omitempty"`
-	Started   *time.Time `json:"started,omitempty"`
-	Done      time.Time  `json:"done"`
-	CycleDays *float64   `json:"cycleDays,omitempty"`
-	URL       string     `json:"url"`
+	Key           string     `json:"key"`
+	Summary       string     `json:"summary"`
+	Type          string     `json:"type,omitempty"`
+	Assignee      string     `json:"assignee,omitempty"`      // username
+	AssigneeName  string     `json:"assigneeName,omitempty"`  // display name
+	AssigneeEmail string     `json:"assigneeEmail,omitempty"` // to join with other systems
+	Started       *time.Time `json:"started,omitempty"`
+	Done          time.Time  `json:"done"`
+	CycleDays     *float64   `json:"cycleDays,omitempty"`
+	URL           string     `json:"url"`
 }
 
 const jiraTime = "2006-01-02T15:04:05.000-0700"
@@ -138,7 +142,9 @@ func (c *Client) BoardFlow(ctx context.Context, req FlowRequest) (*FlowReport, e
 			colOf[st.ID] = i
 		}
 	}
-	report := &FlowReport{Board: *board, From: from, To: now, StartColumn: cols[start].Name, DoneColumn: cols[done].Name}
+	// Empty lists, not null, when nothing finished: scripts iterate them.
+	report := &FlowReport{Board: *board, From: from, To: now, StartColumn: cols[start].Name, DoneColumn: cols[done].Name,
+		Weekly: []WeekCount{}, Columns: []ColumnTime{}, Issues: []FlowIssue{}}
 	spent := make([][]float64, len(cols))
 	var cycles []float64
 	weeks := map[string]int{}
@@ -150,6 +156,9 @@ func (c *Client) BoardFlow(ctx context.Context, req FlowRequest) (*FlowReport, e
 		fi := FlowIssue{Key: is.Key, Summary: is.Fields.Summary, Done: f.done, URL: is.URL}
 		if t := is.Fields.IssueType; t != nil {
 			fi.Type = t.Name
+		}
+		if u := is.Fields.Assignee; u != nil {
+			fi.Assignee, fi.AssigneeName, fi.AssigneeEmail = u.Name, u.DisplayName, u.EmailAddress
 		}
 		if f.started != nil {
 			d := days(f.done.Sub(*f.started))
