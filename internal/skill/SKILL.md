@@ -302,9 +302,12 @@ jira8 issue rank ABC-1 ABC-2 --top --board "Team Kanban"
   column; `--start-column`) or any later one, to the last entry into done;
   `columns: [{name, days, share (%), perIssue: {count, p50, p85, max}}]` for
   the columns from start to before done (and earlier ones cards were sent
-  back to); `issues: [{key, summary, type,
-  started?, done, cycleDays?, url}]` (`--issues` lists them in text). Issues
-  that skipped straight to done count in `throughput` only. It uses the board
+  back to); `issues: [{key, summary, type, assignee?, assigneeName?,
+  assigneeEmail?, started?, done, cycleDays?, url}]` (`--issues` lists them
+  in text; the assignee is the current one; per-person throughput = count by
+  assignee). Lists are `[]`, never null, when nothing finished. Issues that
+  skipped straight to done (no `started`) count in `throughput` only: for a
+  delivery forecast, drop them, they are mostly closes without work. It uses the board
   filter without the kanban sub-filter, and reads each issue's history: long
   periods on busy boards are slow.
 - **`board aging`** lists the cards of the in-progress columns, oldest in
