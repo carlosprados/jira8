@@ -20,8 +20,11 @@ var BoardCmd = &cobra.Command{
 }
 
 var listCmd = &cobra.Command{
-	Use:     "list",
-	Short:   "List the boards of a project (all visible boards without a project)",
+	Use:   "list",
+	Short: "List the boards of a project (all visible boards without a project)",
+	Long: `Lists the boards of a project. Without --project it uses the configured
+default project ('jira8 config show'), so it lists every visible board only
+when no default project is configured.`,
 	Example: "  jira8 board list --project ABC",
 	Args:    cobra.NoArgs,
 	RunE:    runList,

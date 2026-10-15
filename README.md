@@ -200,6 +200,7 @@ first use — no hardcoded `customfield_XXXXX` required.
 ```bash
 jira8 epic list                                   # Epics in default project
 jira8 epic list --status "In Progress"
+jira8 epic list --progress --max 0                # children todo/doing/done + estimates per Epic
 
 jira8 epic view MYPROJ-42                         # Epic + its children
 jira8 epic view MYPROJ-42 --no-children           # Epic only
@@ -355,9 +356,11 @@ fails, you get back the new key and the upload error so you can retry with
 
 ### Project metadata
 
-Query valid values for issue types, statuses, priorities and fields:
+List every project you can browse (with its lead) and query valid values for
+issue types, statuses, priorities and fields:
 
 ```bash
+jira8 project list                        # all projects, idle ones too, with lead and category
 jira8 project types                       # issue types available for creation
 jira8 project statuses                    # statuses grouped by issue type
 jira8 project priorities                  # global priority levels

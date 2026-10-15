@@ -1,6 +1,6 @@
 ---
 name: jira8
-description: Read and change issues in a Jira Server 8 / Data Center instance from the shell with the `jira8` CLI — list and search (JQL), view with comments and change history, create, edit, transition, view kanban boards and rank on them, link, assign, watch, comment, log work, attach files, manage Epics, and query a project's valid types, statuses and priorities. Load whenever the task mentions Jira, an issue key (ABC-123), tickets, bugs, stories, epics, sprints or kanban columns, worklogs or "imputar horas" in Jira, or turning notes into Jira issues. Use INSTEAD of calling the Jira REST API by hand.
+description: Read and change issues in a Jira Server 8 / Data Center instance from the shell with the `jira8` CLI — list and search (JQL), view with comments and change history, create, edit, transition, view kanban boards and rank on them, link, assign, watch, comment, log work, attach files, manage Epics and their progress, list projects, and query a project's valid types, statuses and priorities. Load whenever the task mentions Jira, an issue key (ABC-123), tickets, bugs, stories, epics, sprints or kanban columns, worklogs or "imputar horas" in Jira, or turning notes into Jira issues. Use INSTEAD of calling the Jira REST API by hand.
 ---
 
 # jira8 — Jira Server 8 from the shell
@@ -26,6 +26,8 @@ is coloured and may change. Every Jira command honours `-o json`, writes include
 | Command | JSON |
 |---|---|
 | `issue list`, `epic list`, `epic children` | array of issues (`key`, `url`, `fields.*`) |
+| `epic list --progress` | the same Epics, each with `progress: {children, todo, doing, done, unestimated, originalEstimateSeconds, remainingEstimateSeconds, timeSpentSeconds}` (see Epics) |
+| `project list` | array of `{key, id, name, type, lead, leadName, leadEmail, category?, archived?, url}` |
 | `issue view` | one issue; `fields.comment.comments[]`, `changelog` with `--with-history` |
 | `comment-list`, `worklog-list`, `attachment list` | array (`id`, `body` / `timeSpent`, `started`, `comment` / `filename`) |
 | `issue create`, `epic create` | `{id, key, self, url}` (+ `attachments[]`) |
@@ -64,6 +66,7 @@ KEY=$(jira8 issue create --project ABC --type Task --summary "…" -o json | jq 
 Never guess names: Jira rejects unknown values and each project differs.
 
 ```sh
+jira8 project list -o json                       # every project you can browse, idle ones too, with its lead
 jira8 project types --project ABC -o json        # issue types; subtask:true needs --parent
 jira8 project statuses --project ABC -o json     # statuses per issue type
 jira8 project priorities -o json
@@ -260,7 +263,7 @@ jira8 issue edit ABC-123 --field customfield_10300='{"value":"Gold"}'
 ## Kanban boards
 
 ```sh
-jira8 board list --project ABC -o json           # [{id, name, type}]
+jira8 board list --project ABC -o json           # [{id, name, type}]; without --project, the configured one
 jira8 board view "Team Kanban" --project ABC -o json
 jira8 board view 110 --column "In Progress" --max 50 -o json
 jira8 board view 110 --assignee me --max 0       # counts only
@@ -339,9 +342,19 @@ fields by themselves; never hardcode `customfield_…` ids. Prefer
 `epic create` over `issue create --type Epic`, which also needs `--epic-name`.
 
 ```sh
+jira8 epic list --project ABC --progress --max 0 -o json   # every Epic with its children counted
 jira8 epic create --project ABC --name "Billing v2" --summary "Billing v2" --markdown --description-file epic.md
 jira8 epic edit ABC-42 --name "Billing v2 (rev)"
 ```
+
+- `--progress` counts each Epic's children (issues linked to it; their
+  sub-tasks are not counted) by status category: `todo` (new), `doing`
+  (indeterminate), `done`. Estimates are summed in seconds: original over all
+  children, remaining over children not done, plus time spent; `unestimated`
+  counts children without an original estimate, so 0 seconds with
+  `unestimated == children` means nobody estimated. One search per 100 Epics,
+  not one per Epic: use it instead of looping over `epic children`.
+- `epic list` stops at `--max` (default 50); `--max 0` lists them all.
 
 ## Destructive commands
 
